@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-ivory text-charcoal;
+  }
+
+  /* 스크롤바 스타일 */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { @apply bg-transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-mint-200 rounded-full; }
+}
+
+@layer utilities {
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 16px); }
+  .min-h-touch { min-height: 48px; }
+
+  /* 고대비 모드 */
+  .high-contrast {
+    @apply bg-white text-black;
+  }
+  .high-contrast .bg-ivory { @apply bg-white; }
+  .high-contrast .bg-mint-100 { @apply border-2 border-black bg-white; }
+  .high-contrast .bg-lavender-100 { @apply border-2 border-black bg-white; }
+
+  /* 모션 감소 */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* 뷰어 텍스트 연령별 크기 */
+.viewer-7-9  { font-size: 24px; line-height: 1.7; }
+.viewer-10-13 { font-size: 20px; line-height: 1.6; }
+.viewer-14-18 { font-size: 18px; line-height: 1.6; }
