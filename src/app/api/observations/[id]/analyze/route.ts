@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import OpenAI from 'openai'
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+import { getOpenAIClient } from '@/lib/openai/client'
 
 const SEAT_SYSTEM_PROMPT = `당신은 ABA(응용행동분석) 전문가입니다. 다음 ABC 행동 관찰 데이터를 SEAT 기능 분석 틀에 따라 분류하고, 대체행동 목표를 제안하세요.
 
@@ -51,7 +49,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   // GPT-4o SEAT 분류
   try {
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4o',
       response_format: { type: 'json_object' },
       messages: [
