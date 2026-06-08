@@ -18,7 +18,7 @@ export async function PATCH(_: NextRequest, { params }: Params) {
 
   if (!avatar) return NextResponse.json({ error: '아바타를 찾을 수 없습니다.' }, { status: 404 })
 
-  const parentId = (avatar.children as { parent_id: string } | null)?.parent_id
+  const parentId = (avatar.children as unknown as { parent_id: string } | null)?.parent_id
   if (parentId !== user.id) {
     return NextResponse.json({ error: '권한이 없습니다.' }, { status: 403 })
   }

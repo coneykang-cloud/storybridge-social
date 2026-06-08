@@ -10,8 +10,8 @@ import { SixWHGuide } from '@/components/story/SixWHGuide'
 import { ChunkingStrategyPanel } from '@/components/story/ChunkingStrategyPanel'
 import { ChildSelectorPanel } from '@/components/story/ChildSelectorPanel'
 import { useStoryStore } from '@/stores/story.store'
-import { useChildStore } from '@/stores/child.store'
-import type { ChunkingType, PresentationMode, Child } from '@/types/app.types'
+import { useChildStore, type ChildWithAvatars } from '@/stores/child.store'
+import type { ChunkingType, PresentationMode } from '@/types/app.types'
 
 export default function TrackBPage() {
   const router = useRouter()
@@ -66,7 +66,7 @@ export default function TrackBPage() {
           <ChildSelectorPanel
             children={children}
             selectedId={selectedChild?.id ?? null}
-            onSelect={(child: Child) => selectChild(child)}
+            onSelect={(child: ChildWithAvatars) => selectChild(child)}
           />
         )}
 

@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { ChildSelectorPanel } from '@/components/story/ChildSelectorPanel'
 import { ObservationForm } from '@/components/story/ObservationForm'
-import { useChildStore } from '@/stores/child.store'
-import type { BehaviorObservation, Child, UserRole } from '@/types/app.types'
+import { useChildStore, type ChildWithAvatars } from '@/stores/child.store'
+import type { BehaviorObservation, UserRole } from '@/types/app.types'
 
 interface NewObservationClientProps {
   role: UserRole
@@ -67,7 +67,7 @@ export function NewObservationClient({ role }: NewObservationClientProps) {
           <ChildSelectorPanel
             children={children}
             selectedId={selectedChild?.id ?? null}
-            onSelect={(child: Child) => selectChild(child)}
+            onSelect={(child: ChildWithAvatars) => selectChild(child)}
           />
         )}
 

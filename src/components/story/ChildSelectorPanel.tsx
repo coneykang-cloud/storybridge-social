@@ -2,9 +2,7 @@
 
 import Image from 'next/image'
 import { clsx } from 'clsx'
-import type { Child, Avatar } from '@/types/app.types'
-
-type ChildWithAvatars = Child & { avatars?: Avatar[] }
+import type { ChildWithAvatars } from '@/stores/child.store'
 
 const AGE_GROUP_LABEL: Record<string, string> = {
   '5-6':   '미취학',
@@ -17,7 +15,7 @@ const AGE_GROUP_LABEL: Record<string, string> = {
 interface ChildSelectorPanelProps {
   children: ChildWithAvatars[]
   selectedId: string | null
-  onSelect: (child: Child) => void
+  onSelect: (child: ChildWithAvatars) => void
 }
 
 function ChildAvatar({ child, size }: { child: ChildWithAvatars; size: 'sm' | 'md' }) {

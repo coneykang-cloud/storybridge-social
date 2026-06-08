@@ -10,8 +10,8 @@ import { TherapyGoalTags } from '@/components/story/TherapyGoalTags'
 import { ChunkingStrategyPanel } from '@/components/story/ChunkingStrategyPanel'
 import { ChildSelectorPanel } from '@/components/story/ChildSelectorPanel'
 import { useStoryStore } from '@/stores/story.store'
-import { useChildStore } from '@/stores/child.store'
-import type { ChunkingType, PresentationMode, Child } from '@/types/app.types'
+import { useChildStore, type ChildWithAvatars } from '@/stores/child.store'
+import type { ChunkingType, PresentationMode } from '@/types/app.types'
 
 const SIX_WH_GUIDE = [
   { icon: '👤', label: '누가', desc: '치료 대상 아동 + 등장인물' },
@@ -99,13 +99,13 @@ export default function TrackAPage() {
           <ChildSelectorPanel
             children={children}
             selectedId={selectedChild?.id ?? null}
-            onSelect={(child: Child) => selectChild(child)}
+            onSelect={(child: ChildWithAvatars) => selectChild(child)}
           />
         )}
         <div className="flex-1 space-y-5 pb-24">
 
       <div>
-        <h1 className="text-2xl font-bold text-charcoal">{selectedChild.name}의 치료 스토리</h1>
+        <h1 className="text-2xl font-bold text-charcoal">{selectedChild?.name}의 치료 스토리</h1>
         <p className="text-sm text-soft-gray mt-1">치료 목표 기반 소셜스토리를 만들어요</p>
       </div>
 

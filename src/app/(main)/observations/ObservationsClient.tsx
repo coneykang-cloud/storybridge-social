@@ -6,8 +6,8 @@ import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ChildSelectorPanel } from '@/components/story/ChildSelectorPanel'
 import { ObservationHistory } from '@/components/story/ObservationHistory'
-import { useChildStore } from '@/stores/child.store'
-import type { BehaviorObservation, Child } from '@/types/app.types'
+import { useChildStore, type ChildWithAvatars } from '@/stores/child.store'
+import type { BehaviorObservation } from '@/types/app.types'
 
 export function ObservationsClient() {
   const router = useRouter()
@@ -47,7 +47,7 @@ export function ObservationsClient() {
         <ChildSelectorPanel
           children={children}
           selectedId={selectedChild?.id ?? null}
-          onSelect={(child: Child) => selectChild(child)}
+          onSelect={(child: ChildWithAvatars) => selectChild(child)}
         />
       )}
 

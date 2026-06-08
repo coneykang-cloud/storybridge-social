@@ -10,8 +10,8 @@ import { SchoolContextTags } from '@/components/story/SchoolContextTags'
 import { ChunkingStrategyPanel } from '@/components/story/ChunkingStrategyPanel'
 import { ChildSelectorPanel } from '@/components/story/ChildSelectorPanel'
 import { useStoryStore } from '@/stores/story.store'
-import { useChildStore } from '@/stores/child.store'
-import type { ChunkingType, PresentationMode, Child } from '@/types/app.types'
+import { useChildStore, type ChildWithAvatars } from '@/stores/child.store'
+import type { ChunkingType, PresentationMode } from '@/types/app.types'
 
 const SIX_WH_GUIDE = [
   { icon: '👤', label: '누가', desc: '아동 + 학급 친구들 / 선생님' },
@@ -78,12 +78,12 @@ export default function TrackCPage() {
           <ChildSelectorPanel
             children={children}
             selectedId={selectedChild?.id ?? null}
-            onSelect={(child: Child) => selectChild(child)}
+            onSelect={(child: ChildWithAvatars) => selectChild(child)}
           />
         )}
         <div className="flex-1 space-y-5 pb-24">
       <div>
-        <h1 className="text-2xl font-bold text-charcoal">{selectedChild.name}의 학교 이야기</h1>
+        <h1 className="text-2xl font-bold text-charcoal">{selectedChild?.name}의 학교 이야기</h1>
         <p className="text-sm text-soft-gray mt-1">학교 상황 소셜스토리를 만들어요</p>
       </div>
 
