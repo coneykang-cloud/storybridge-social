@@ -1,10 +1,10 @@
 # StoryBridge 구현 계획 (Implementation Plan) v2.0
 
-**버전:** v2.4  
-**작성일:** 2026.06.05 / 최종 업데이트: 2026.06.08  
+**버전:** v2.5  
+**작성일:** 2026.06.05 / 최종 업데이트: 2026.06.09  
 **작성자:** 강현정  
 **참조:** PRD v3.4 / HLD v2.4 / LLD v2.5  
-**변경 이력:** v1.0 → v2.0 (3-Track 모델, 청킹 2차원화, 누적 제시 UI 반영) / v2.0 → v2.1 (완료 항목 체크, migration 004 추가, 5구간 연령대) / v2.1 → v2.2 (Phase 5에 행동 관찰하기 5-6 태스크 추가) / v2.2 → v2.3 (행동 관찰하기·협업 그룹 항목 완료 처리 및 마이그레이션 007~013 반영, 브릿지 책장·제목 자동생성/인라인 수정·creator 수정삭제 권한 Phase 5-7 신규 추가) / v2.3 → v2.4 (이미지 생성 파이프라인 Replicate 전환·아바타 캐릭터 일관성, TTS 읽어주기 정상화 3건 버그 수정 완료 처리, 아바타 생성 PhotoMaker→DALL·E 2 실제 구현 정정)
+**변경 이력:** v1.0 → v2.0 (3-Track 모델, 청킹 2차원화, 누적 제시 UI 반영) / v2.0 → v2.1 (완료 항목 체크, migration 004 추가, 5구간 연령대) / v2.1 → v2.2 (Phase 5에 행동 관찰하기 5-6 태스크 추가) / v2.2 → v2.3 (행동 관찰하기·협업 그룹 항목 완료 처리 및 마이그레이션 007~013 반영, 브릿지 책장·제목 자동생성/인라인 수정·creator 수정삭제 권한 Phase 5-7 신규 추가) / v2.3 → v2.4 (이미지 생성 파이프라인 Replicate 전환·아바타 캐릭터 일관성, TTS 읽어주기 정상화 3건 버그 수정 완료 처리, 아바타 생성 PhotoMaker→DALL·E 2 실제 구현 정정) / v2.4 → v2.5 (Phase 6-5 배포 항목을 실제 진행 상황(GitHub 연결·Vercel 배포·빌드 오류 수정)에 맞게 갱신)
 
 ---
 
@@ -317,10 +317,20 @@ W1  W2  W3  W4  W5  W6  W7  W8  W9  W10  W11  W12
 - [ ] Supabase 쿼리 최적화
 
 #### 6-5. 배포
-- [ ] Vercel 환경 변수 설정
+- [x] **GitHub 저장소 연결 (2026-06-09):** 기존 `coneykang-cloud/storybridge` 저장소(placeholder `index.html`만 존재)에 실제 Next.js 코드베이스를 force-push로 덮어씀 (135개 파일, 최초 커밋). `.gitignore`로 `.env*` 파일이 정상 제외됨을 확인 후 진행
+- [x] **Vercel 프로젝트 생성 및 최초 배포 (2026-06-09):** GitHub 저장소 import → 환경 변수 7개 등록(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `REPLICATE_API_KEY`, `GOOGLE_TTS_API_KEY`, `NEXT_PUBLIC_APP_URL`) → 배포 성공. 배포 URL: `https://storybridge-social.vercel.app` (`/signin`으로 정상 리디렉션 및 로드 확인)
+- [x] **배포 전 빌드 오류 수정 (2026-06-09, 총 6건):**
+  - `ChildSelectorPanel`의 `onSelect` 콜백 타입 불일치(`Child` → `ChildWithAvatars`) — `selectChild`가 요구하는 타입과 어긋나 5개 페이지(`observations/new`, `ObservationsClient`, `story/create/{parent,teacher,therapist}`)에서 타입 에러 발생, 통일하여 수정
+  - teacher/therapist 스토리 생성 페이지에서 `selectedChild`가 `null`일 가능성을 처리하지 않은 타입 에러 → 옵셔널 체이닝으로 수정
+  - `avatar/[id]` 및 `avatar/[id]/default` API 라우트에서 Supabase `children` 조인 결과 캐스팅 오류 → `story/[id]` 라우트와 동일하게 `unknown` 경유 캐스팅으로 통일
+  - `observations/[id]/analyze` 라우트가 OpenAI 클라이언트를 **모듈 최상단(import 시점)**에 즉시 생성해, `OPENAI_API_KEY`가 없는 빌드 환경(Vercel 최초 빌드)에서 "environment variable is missing" 에러로 빌드 자체가 실패 → 다른 라우트와 동일하게 `lib/openai/client`의 지연 생성 싱글톤(`getOpenAIClient`)으로 통일
+- [x] **Vercel 환경 변수 설정 (2026-06-09):** 위 7개 변수 등록 완료, 배포 후 미들웨어(Supabase 클라이언트 생성)·홈/로그인 라우팅 정상 동작 확인
+- [ ] **Supabase Auth 리디렉션 URL 설정:** Authentication → URL Configuration에서 Site URL/Redirect URLs를 `https://storybridge-social.vercel.app`로 등록 — 안내 완료, 사용자 측 적용 확인 대기
 - [ ] Supabase 프로덕션 RLS 최종 검증 (청킹 수정 권한 포함)
-- [ ] 도메인 연결
+- [ ] 커스텀 도메인 연결
 - [ ] 모니터링 설정
+
+> **트러블슈팅 메모:** 배포 초기에 `https://storybridge.vercel.app`(타 사용자의 동명 프로젝트, "조부모 음성 동화" 서비스)와 GitHub Pages 주소(`coneykang-cloud.github.io/storybridge`, 정적 파일 전용이라 Next.js 앱을 서빙할 수 없어 404)를 우리 배포로 착각한 해프닝이 있었음. `*.vercel.app` 서브도메인은 전역 유일이라 실제 배포 주소는 Vercel 대시보드에서 직접 확인해야 함.
 
 ---
 
@@ -402,4 +412,12 @@ Phase 1 (기반 + DB v2)
 
 ---
 
-*StoryBridge Plan v2.4 | 2026.06.08*
+## v2.4 → v2.5 변경 요약 (2026.06.09)
+
+| Phase | 추가/변경 내용 |
+|---|---|
+| Phase 6-5 | "배포" 항목을 계획 단계 체크리스트에서 실제 진행 상황으로 전면 갱신 — GitHub 저장소 연결(force-push 덮어쓰기), Vercel 프로젝트 생성·환경 변수 7개 등록·최초 배포 성공(`https://storybridge-social.vercel.app`), 배포 전 발견된 빌드 차단 오류 6건 수정 이력(타입 에러 5건 + OpenAI 클라이언트 즉시 생성으로 인한 빌드 실패 1건) 반영. Supabase Auth 리디렉션 URL 설정·RLS 최종 검증·커스텀 도메인·모니터링은 미완료로 별도 표기 |
+
+---
+
+*StoryBridge Plan v2.5 | 2026.06.09*
