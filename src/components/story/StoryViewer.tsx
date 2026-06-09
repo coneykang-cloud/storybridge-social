@@ -59,7 +59,7 @@ export function StoryViewer({
     return () => { if (slideshowTimerRef.current) clearTimeout(slideshowTimerRef.current) }
   }, [mode, isPlaying, currentIndex, total, slideshowInterval, goNext])
 
-  const playTTS = async () => {
+  const playTTS = useCallback(async () => {
     if (!page) return
     try {
       const text = [page.descriptive, page.perspective, page.coaching].filter(Boolean).join(' ')
@@ -73,7 +73,13 @@ export function StoryViewer({
     } catch (err) {
       console.error('TTS error:', err)
     }
-  }
+  }, [page, voice])
+
+  // autoplay 모드: 페이지가 바뀌면 자동으로 TTS 시작
+  useEffect(() => {
+    if (mode !== 'autoplay') return
+    playTTS()
+  }, [mode, currentIndex, playTTS])
 
   if (!page) return null
 
