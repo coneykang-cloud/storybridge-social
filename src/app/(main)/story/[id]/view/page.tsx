@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { StoryViewer } from '@/components/story/StoryViewer'
+import { StoryPdfButton } from '@/components/story/StoryPdfButton'
 import type { Story, StoryPage } from '@/types/app.types'
 
 interface Props {
@@ -35,7 +36,7 @@ export default async function StoryViewPage({ params, searchParams }: Props) {
         <Link href={`/story/${id}`} className="text-sm text-soft-gray flex items-center gap-1 hover:text-charcoal">
           ← 뒤로
         </Link>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           {(['manual', 'autoplay', 'slideshow'] as const).map((m) => (
             <Link
               key={m}
@@ -47,6 +48,12 @@ export default async function StoryViewPage({ params, searchParams }: Props) {
               {m === 'manual' ? '수동' : m === 'autoplay' ? '자동' : '슬라이드'}
             </Link>
           ))}
+          <StoryPdfButton
+            title={story.title}
+            childName={story.children?.name}
+            homeConnectionMemo={story.home_connection_memo}
+            pages={pages}
+          />
         </div>
       </header>
 
