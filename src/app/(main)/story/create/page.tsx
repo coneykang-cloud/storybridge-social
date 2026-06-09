@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/Card'
 import { TrackBadge } from '@/components/story/TrackBadge'
 import type { UserRole } from '@/types/app.types'
 
-const TRACK_PAGES: Record<UserRole, string> = {
+const TRACK_PAGES: Partial<Record<UserRole, string>> = {
   therapist: '/story/create/therapist',
   parent:    '/story/create/parent',
   teacher:   '/story/create/teacher',
@@ -27,7 +27,7 @@ export default async function StoryCreatePage() {
 
   // 역할이 있으면 해당 Track 페이지로 자동 이동
   if (role && role in TRACK_PAGES) {
-    redirect(TRACK_PAGES[role])
+    redirect(TRACK_PAGES[role]!)
   }
 
   // 역할 없을 때 수동 선택

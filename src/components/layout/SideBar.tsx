@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { LogoHorizontal } from '@/components/ui/Logo'
 
 import { Home, BookPlus, BookOpen, Palette, Users, Settings, Bell, LogOut, UserCircle, ClipboardList } from 'lucide-react'
 import { clsx } from 'clsx'
@@ -18,6 +19,8 @@ const navItems = [
   { href: '/collab',        icon: Users,          label: '협업 공간' },
   { href: '/settings',      icon: Settings,       label: '설정' },
 ]
+
+const CHILD_NAV_HREFS = ['/bookshelf', '/settings']
 
 interface SideBarProps {
   pendingCount?: number
@@ -41,10 +44,8 @@ export function SideBar({ pendingCount = 0, role }: SideBarProps) {
       {/* 상단: 로고 + 역할 배지 */}
       <div className="px-5 mb-6">
         <Link href="/dashboard" className="block hover:opacity-80 transition-opacity">
-          <h1 className="text-xl font-bold text-charcoal">
-            Story<span className="text-mint-600">Bridge</span>
-          </h1>
-          <p className="text-xs text-soft-gray mt-0.5">우리 아이의 이야기</p>
+          <LogoHorizontal size="sm" />
+          <p className="text-xs text-soft-gray mt-1">우리 아이의 이야기</p>
         </Link>
 
         {role && (
@@ -56,7 +57,7 @@ export function SideBar({ pendingCount = 0, role }: SideBarProps) {
 
       {/* 네비게이션 */}
       <nav className="flex-1 px-3 space-y-1">
-        {navItems.map(({ href, icon: Icon, label }) => {
+        {(role === 'child' ? navItems.filter(i => CHILD_NAV_HREFS.includes(i.href)) : navItems).map(({ href, icon: Icon, label }) => {
           const isActive = pathname.startsWith(href)
           return (
             <Link

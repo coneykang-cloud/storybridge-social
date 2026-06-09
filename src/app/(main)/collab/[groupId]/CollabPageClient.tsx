@@ -128,7 +128,7 @@ export function CollabPageClient({
                   </div>
                   <span className="font-medium text-sm text-charcoal">{member.user.full_name}</span>
                 </div>
-                <RoleBadge role={member.user.role as 'parent' | 'therapist' | 'teacher'} />
+                <RoleBadge role={member.user.role as import('@/types/app.types').UserRole} />
               </div>
             </Card>
           ))}

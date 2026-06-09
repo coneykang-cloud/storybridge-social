@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Logo } from '@/components/ui/Logo'
 import { createClient } from '@/lib/supabase/client'
 
 export default function SignInPage() {
@@ -36,10 +37,8 @@ export default function SignInPage() {
     <div className="min-h-screen flex flex-col justify-center items-center px-5 bg-ivory">
       {/* 로고 */}
       <div className="text-center mb-10">
-        <h1 className="text-3xl font-bold text-charcoal">
-          Story<span className="text-mint-600">Bridge</span>
-        </h1>
-        <p className="text-sm text-soft-gray mt-2">우리 아이의 이야기, 함께 만들어요</p>
+        <Logo size="lg" />
+        <p className="text-sm text-soft-gray mt-3">우리 아이의 이야기, 함께 만들어요</p>
       </div>
 
       <div className="w-full max-w-sm">

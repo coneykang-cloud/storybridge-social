@@ -50,7 +50,7 @@ export default async function CollabIndexPage() {
                       초대코드: <span className="font-mono font-bold text-mint-600">{group.invite_code}</span>
                     </p>
                   </div>
-                  <RoleBadge role={m.role as 'parent' | 'therapist' | 'teacher'} />
+                  <RoleBadge role={m.role as import('@/types/app.types').UserRole} />
                 </div>
               </Card>
             </Link>

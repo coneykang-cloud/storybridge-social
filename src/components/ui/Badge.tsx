@@ -12,12 +12,14 @@ const roleStyles: Record<UserRole, string> = {
   parent:    'bg-mint-300 text-charcoal',
   therapist: 'bg-lavender-300 text-charcoal',
   teacher:   'bg-orange-100 text-charcoal',
+  child:     'bg-yellow-100 text-charcoal',
 }
 
 const roleLabels: Record<UserRole, string> = {
   parent:    '보호자',
   therapist: '치료사',
   teacher:   '선생님',
+  child:     '아이',
 }
 
 export function RoleBadge({ role, className }: { role: UserRole; className?: string }) {

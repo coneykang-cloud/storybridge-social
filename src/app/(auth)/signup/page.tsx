@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { clsx } from 'clsx'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Logo } from '@/components/ui/Logo'
 import { createClient } from '@/lib/supabase/client'
 import type { UserRole } from '@/types/app.types'
 
@@ -13,6 +14,7 @@ const ROLES: { value: UserRole; emoji: string; label: string; desc: string }[] =
   { value: 'parent',    emoji: '🧑‍👧', label: '보호자',   desc: '아이의 부모 또는 양육자' },
   { value: 'therapist', emoji: '🩺',   label: '치료사',   desc: '언어·행동 치료사' },
   { value: 'teacher',   emoji: '👩‍🏫', label: '선생님',   desc: '특수교사 또는 일반교사' },
+  { value: 'child',     emoji: '🧒',   label: '아이',     desc: '소셜 스토리를 읽는 어린이' },
 ]
 
 type Step = 1 | 2
@@ -92,9 +94,7 @@ export default function SignUpPage() {
   return (
     <div className="min-h-screen flex flex-col justify-center items-center px-5 bg-ivory">
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-charcoal">
-          Story<span className="text-mint-600">Bridge</span>
-        </h1>
+        <Logo size="lg" />
       </div>
 
       {/* STEP 1: 역할 선택 */}

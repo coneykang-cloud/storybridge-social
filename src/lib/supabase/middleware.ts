@@ -28,9 +28,9 @@ export async function updateSession(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/signin') ||
-                      request.nextUrl.pathname.startsWith('/signup')
-  const isApiRoute  = request.nextUrl.pathname.startsWith('/api')
+  const { pathname } = request.nextUrl
+  const isAuthRoute = pathname.startsWith('/signin') || pathname.startsWith('/signup')
+  const isApiRoute  = pathname.startsWith('/api')
 
   if (!user && !isAuthRoute && !isApiRoute) {
     const url = request.nextUrl.clone()
@@ -40,8 +40,24 @@ export async function updateSession(request: NextRequest) {
 
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
+    const role = user.user_metadata?.role as string | undefined
+    url.pathname = role === 'child' ? '/bookshelf' : '/dashboard'
     return NextResponse.redirect(url)
+  }
+
+  // child 역할: 브릿지 책장·스토리 읽기·설정만 허용, 스토리 생성은 차단
+  if (user && !isApiRoute) {
+    const role = user.user_metadata?.role as string | undefined
+    const CHILD_ALLOWED = ['/bookshelf', '/settings', '/story']
+    const CHILD_BLOCKED = ['/story/create']
+    if (
+      role === 'child' &&
+      (!CHILD_ALLOWED.some(p => pathname.startsWith(p)) || CHILD_BLOCKED.some(p => pathname.startsWith(p)))
+    ) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/bookshelf'
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse

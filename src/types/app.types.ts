@@ -1,5 +1,5 @@
 // ── 기본 타입 ────────────────────────────────────────────────────
-export type UserRole = 'parent' | 'therapist' | 'teacher'
+export type UserRole = 'parent' | 'therapist' | 'teacher' | 'child'
 export type AvatarStyle = 'ghibli' | 'realistic' | 'pixar' | 'watercolor'
 export type AgeGroup = '5-6' | '7-9' | '10-12' | '13-15' | '16-18'
 export type StorySource = 'ai' | 'pool' | 'manual'
@@ -361,5 +361,6 @@ export const RECORDER_ROLE_META: Record<UserRole, { label: string; emoji: string
   parent:    { label: '보호자', emoji: '👪' },
   therapist: { label: '치료사', emoji: '🩺' },
   teacher:   { label: '교사',   emoji: '🍎' },
+  child:     { label: '아이',   emoji: '👧' },
 }
 

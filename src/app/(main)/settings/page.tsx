@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useUIStore } from '@/stores/ui.store'
 import { useAuthStore } from '@/stores/auth.store'
 
-const ROLE_LABEL = { parent: '보호자', therapist: '치료사', teacher: '교사' }
+const ROLE_LABEL = { parent: '보호자', therapist: '치료사', teacher: '교사', child: '아이' }
 
 export default function SettingsPage() {
   const router = useRouter()

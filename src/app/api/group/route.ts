@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (!profile || profile.role === 'parent') {
-    return NextResponse.json({ error: 'Parents cannot join via invite code' }, { status: 403 })
+    return NextResponse.json({ error: '보호자는 초대 코드로 참여할 수 없어요.' }, { status: 403 })
   }
 
   // 그룹 멤버 추가

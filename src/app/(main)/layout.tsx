@@ -23,7 +23,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
       <main className="flex-1 overflow-y-auto pb-20 md:pb-0">
         {children}
       </main>
-      <BottomNavBar />
+      <BottomNavBar role={role} />
     </div>
   )
 }
