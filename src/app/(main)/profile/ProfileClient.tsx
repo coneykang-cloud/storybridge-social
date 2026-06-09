@@ -114,11 +114,10 @@ export function ProfileClient({ children, userId }: Props) {
   }
 
   return (
-    <div className="flex gap-0 md:gap-5 h-full">
+    <div className="flex gap-3 md:gap-5 h-full">
 
-      {/* ── 좌측: 아이 목록 ───────────────────────── */}
-      {/* 모바일: 수평 스크롤 */}
-      <div className="md:hidden flex gap-3 overflow-x-auto pb-3 -mx-5 px-5 mb-4">
+      {/* ── 좌측: 아이 목록 (모바일: 좁은 컬럼 / PC: 넓은 패널) ── */}
+      <div className="flex flex-col w-20 md:w-52 flex-shrink-0 gap-2">
         {childList.map((child) => {
           const avatar = child.avatars?.find((a) => a.is_default) ?? child.avatars?.[0]
           const isSelected = child.id === selectedId
@@ -127,43 +126,7 @@ export function ProfileClient({ children, userId }: Props) {
               key={child.id}
               onClick={() => setSelectedId(child.id)}
               className={clsx(
-                'flex flex-col items-center gap-1.5 flex-shrink-0 p-2 rounded-2xl transition-all',
-                isSelected ? 'bg-mint-100 ring-2 ring-mint-400' : 'bg-white border border-gray-100'
-              )}
-            >
-              {avatar ? (
-                <Image src={avatar.image_url} alt={child.name} width={56} height={56}
-                  className="w-14 h-14 rounded-xl object-cover" />
-              ) : (
-                <div className="w-14 h-14 rounded-xl bg-mint-100 flex items-center justify-center text-xl">🧒</div>
-              )}
-              <span className={clsx('text-xs font-medium', isSelected ? 'text-mint-700' : 'text-charcoal')}>
-                {child.name}
-              </span>
-              <span className="text-[10px] text-soft-gray">{AGE_GROUP_LABEL[child.age_group]}</span>
-            </button>
-          )
-        })}
-        <Link href="/onboarding/child"
-          className="flex flex-col items-center gap-1.5 flex-shrink-0 p-2 rounded-2xl bg-white border border-dashed border-mint-300 min-w-[72px]">
-          <div className="w-14 h-14 rounded-xl bg-mint-50 flex items-center justify-center">
-            <Plus size={24} className="text-mint-400" />
-          </div>
-          <span className="text-xs text-mint-600 font-medium">추가</span>
-        </Link>
-      </div>
-
-      {/* PC: 좌측 세로 패널 */}
-      <div className="hidden md:flex flex-col w-52 flex-shrink-0 gap-2">
-        {childList.map((child) => {
-          const avatar = child.avatars?.find((a) => a.is_default) ?? child.avatars?.[0]
-          const isSelected = child.id === selectedId
-          return (
-            <button
-              key={child.id}
-              onClick={() => setSelectedId(child.id)}
-              className={clsx(
-                'flex items-center gap-3 p-3 rounded-2xl text-left transition-all w-full',
+                'flex flex-col md:flex-row items-center md:gap-3 p-2 md:p-3 rounded-2xl text-left transition-all w-full',
                 isSelected
                   ? 'bg-mint-100 ring-2 ring-mint-400'
                   : 'bg-white border border-gray-100 hover:border-mint-200'
@@ -171,25 +134,25 @@ export function ProfileClient({ children, userId }: Props) {
             >
               {avatar ? (
                 <Image src={avatar.image_url} alt={child.name} width={48} height={48}
-                  className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
+                  className="w-10 h-10 md:w-12 md:h-12 rounded-xl object-cover flex-shrink-0" />
               ) : (
-                <div className="w-12 h-12 rounded-xl bg-mint-100 flex items-center justify-center text-xl flex-shrink-0">🧒</div>
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-mint-100 flex items-center justify-center text-lg md:text-xl flex-shrink-0">🧒</div>
               )}
-              <div className="min-w-0">
-                <p className={clsx('font-semibold text-sm truncate', isSelected ? 'text-mint-700' : 'text-charcoal')}>
+              <div className="min-w-0 text-center md:text-left mt-1 md:mt-0">
+                <p className={clsx('font-semibold text-xs truncate', isSelected ? 'text-mint-700' : 'text-charcoal')}>
                   {child.name}
                 </p>
-                <p className="text-xs text-soft-gray">{AGE_GROUP_LABEL[child.age_group]}</p>
+                <p className="text-[10px] text-soft-gray hidden md:block">{AGE_GROUP_LABEL[child.age_group]}</p>
               </div>
             </button>
           )
         })}
         <Link href="/onboarding/child"
-          className="flex items-center gap-3 p-3 rounded-2xl border border-dashed border-mint-300 hover:bg-mint-50 transition-colors">
-          <div className="w-12 h-12 rounded-xl bg-mint-50 flex items-center justify-center flex-shrink-0">
-            <Plus size={20} className="text-mint-400" />
+          className="flex flex-col md:flex-row items-center md:gap-3 p-2 md:p-3 rounded-2xl border border-dashed border-mint-300 hover:bg-mint-50 transition-colors">
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-mint-50 flex items-center justify-center flex-shrink-0">
+            <Plus size={18} className="text-mint-400" />
           </div>
-          <span className="text-sm text-mint-600 font-medium">아이 추가</span>
+          <span className="text-[10px] md:text-sm text-mint-600 font-medium mt-1 md:mt-0">추가</span>
         </Link>
       </div>
 
