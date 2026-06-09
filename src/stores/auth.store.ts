@@ -22,17 +22,17 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   setProfile: (profile) => set({ profile }),
 
   fetchProfile: async () => {
-    const { user } = get()
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const supabase = createClient()
     const { data } = await supabase
       .from('user_profiles')
       .select('*')
       .eq('id', user.id)
       .single()
 
-    if (data) set({ profile: data as UserProfile })
+    if (data) set({ profile: data as UserProfile, user })
   },
 
   signOut: async () => {
