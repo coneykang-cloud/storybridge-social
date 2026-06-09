@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, Contrast, Pencil, Check, X, Mail, KeyRound } from 'lucide-react'
+import { LogOut, Contrast, Pencil, Check, X, KeyRound } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { RoleBadge } from '@/components/ui/Badge'
 import { createClient } from '@/lib/supabase/client'
@@ -18,14 +18,12 @@ export default function SettingsPage() {
 
   const [email, setEmail] = useState<string | null>(null)
 
-  // 프로필 편집
   const [isEditing, setIsEditing] = useState(false)
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  // 비밀번호 재설정
   const [pwResetSent, setPwResetSent] = useState(false)
   const [pwResetLoading, setPwResetLoading] = useState(false)
 
@@ -99,16 +97,27 @@ export default function SettingsPage() {
     <div className="px-5 py-6 max-w-xl mx-auto space-y-4">
       <h1 className="text-2xl font-bold text-charcoal mb-6">설정</h1>
 
-      {/* 내 계정 — 프로필 정보 */}
+      {/* 내 정보 — 프로필 + 로그인 계정 통합 */}
       {profile && (
         <Card>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-soft-gray uppercase tracking-wide">내 계정</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-soft-gray uppercase tracking-wide">내 정보</h2>
             {!isEditing && (
               <button onClick={handleEdit} className="p-1.5 rounded-lg hover:bg-gray-50 text-soft-gray hover:text-charcoal transition-colors">
                 <Pencil size={15} />
               </button>
             )}
+          </div>
+
+          {/* 아바타 + 이름 헤더 */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 rounded-full bg-mint-200 flex items-center justify-center text-mint-700 font-bold text-lg flex-shrink-0">
+              {profile.full_name.charAt(0)}
+            </div>
+            <div>
+              <p className="font-semibold text-charcoal">{profile.full_name}</p>
+              <RoleBadge role={profile.role} className="mt-1" />
+            </div>
           </div>
 
           {isEditing ? (
@@ -121,6 +130,10 @@ export default function SettingsPage() {
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-charcoal focus:outline-none focus:border-mint-400"
                   placeholder="이름을 입력하세요"
                 />
+              </div>
+              <div>
+                <label className="text-xs text-soft-gray font-medium block mb-1">이메일</label>
+                <p className="text-sm text-charcoal px-3 py-2 bg-gray-50 rounded-xl">{email ?? '—'}</p>
               </div>
               <div>
                 <label className="text-xs text-soft-gray font-medium block mb-1">전화번호 (선택)</label>
@@ -157,58 +170,38 @@ export default function SettingsPage() {
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-mint-200 flex items-center justify-center text-mint-700 font-bold text-lg flex-shrink-0">
-                {profile.full_name.charAt(0)}
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between py-2 border-t border-gray-100">
+                <span className="text-soft-gray">이메일</span>
+                <span className="text-charcoal">{email ?? '불러오는 중...'}</span>
               </div>
-              <div>
-                <p className="font-semibold text-charcoal">{profile.full_name}</p>
-                {profile.phone && <p className="text-xs text-soft-gray mt-0.5">{profile.phone}</p>}
-                <RoleBadge role={profile.role} className="mt-1" />
+              <div className="flex items-center justify-between py-2 border-t border-gray-100">
+                <span className="text-soft-gray">전화번호</span>
+                <span className="text-charcoal">{profile.phone || '—'}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-t border-gray-100">
+                <span className="text-soft-gray">역할</span>
+                <span className="text-charcoal">{ROLE_LABEL[profile.role]}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-t border-gray-100">
+                <span className="text-soft-gray">비밀번호</span>
+                {pwResetSent ? (
+                  <span className="text-xs text-mint-600 font-medium">재설정 메일 발송됨 ✓</span>
+                ) : (
+                  <button
+                    onClick={handlePasswordReset}
+                    disabled={pwResetLoading || !email}
+                    className="flex items-center gap-1 text-xs text-mint-600 font-medium hover:text-mint-700 disabled:opacity-50 transition-colors"
+                  >
+                    <KeyRound size={12} />
+                    {pwResetLoading ? '발송 중...' : '재설정 메일 받기'}
+                  </button>
+                )}
               </div>
             </div>
           )}
         </Card>
       )}
-
-      {/* 로그인 계정 정보 */}
-      <Card>
-        <h2 className="text-sm font-semibold text-soft-gray uppercase tracking-wide mb-3">로그인 계정</h2>
-        <div className="space-y-3">
-          {/* 이메일 */}
-          <div className="flex items-center gap-3">
-            <Mail size={16} className="text-soft-gray flex-shrink-0" />
-            <div>
-              <p className="text-xs text-soft-gray font-medium">이메일</p>
-              <p className="text-sm text-charcoal">{email ?? '불러오는 중...'}</p>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-100" />
-
-          {/* 비밀번호 재설정 */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <KeyRound size={16} className="text-soft-gray flex-shrink-0" />
-              <div>
-                <p className="text-xs text-soft-gray font-medium">비밀번호</p>
-                <p className="text-sm text-charcoal">••••••••</p>
-              </div>
-            </div>
-            {pwResetSent ? (
-              <span className="text-xs text-mint-600 font-medium">메일 발송됨 ✓</span>
-            ) : (
-              <button
-                onClick={handlePasswordReset}
-                disabled={pwResetLoading || !email}
-                className="text-xs text-mint-600 font-medium hover:text-mint-700 disabled:opacity-50 transition-colors"
-              >
-                {pwResetLoading ? '발송 중...' : '재설정 메일 받기'}
-              </button>
-            )}
-          </div>
-        </div>
-      </Card>
 
       {/* 접근성 */}
       <Card>
@@ -223,13 +216,9 @@ export default function SettingsPage() {
           </div>
           <button
             onClick={toggleHighContrast}
-            className={`relative w-11 h-6 rounded-full transition-colors ${
-              highContrast ? 'bg-mint-400' : 'bg-gray-200'
-            }`}
+            className={`relative w-11 h-6 rounded-full transition-colors ${highContrast ? 'bg-mint-400' : 'bg-gray-200'}`}
           >
-            <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-              highContrast ? 'translate-x-5' : 'translate-x-0.5'
-            }`} />
+            <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${highContrast ? 'translate-x-5' : 'translate-x-0.5'}`} />
           </button>
         </div>
       </Card>
