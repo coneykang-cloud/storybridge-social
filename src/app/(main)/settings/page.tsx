@@ -1,22 +1,74 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, Contrast } from 'lucide-react'
+import { LogOut, Contrast, Pencil, Check, X } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { RoleBadge } from '@/components/ui/Badge'
 import { createClient } from '@/lib/supabase/client'
 import { useUIStore } from '@/stores/ui.store'
 import { useAuthStore } from '@/stores/auth.store'
 
+const ROLE_LABEL = { parent: '보호자', therapist: '치료사', teacher: '교사' }
+
 export default function SettingsPage() {
   const router = useRouter()
   const { highContrast, toggleHighContrast } = useUIStore()
-  const { profile, fetchProfile } = useAuthStore()
+  const { profile, fetchProfile, setProfile } = useAuthStore()
+
+  const [isEditing, setIsEditing] = useState(false)
+  const [fullName, setFullName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!profile) fetchProfile()
   }, [profile, fetchProfile])
+
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name)
+      setPhone(profile.phone ?? '')
+    }
+  }, [profile])
+
+  const handleEdit = () => {
+    setSaveError(null)
+    setIsEditing(true)
+  }
+
+  const handleCancel = () => {
+    if (profile) {
+      setFullName(profile.full_name)
+      setPhone(profile.phone ?? '')
+    }
+    setIsEditing(false)
+    setSaveError(null)
+  }
+
+  const handleSave = async () => {
+    if (!profile || !fullName.trim()) return
+    setIsSaving(true)
+    setSaveError(null)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .update({ full_name: fullName.trim(), phone: phone.trim() || null })
+        .eq('id', profile.id)
+        .select()
+        .single()
+
+      if (error) throw error
+      if (data) setProfile(data)
+      setIsEditing(false)
+    } catch {
+      setSaveError('저장 중 오류가 발생했어요. 다시 시도해주세요.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -32,16 +84,72 @@ export default function SettingsPage() {
       {/* 내 계정 정보 */}
       {profile && (
         <Card>
-          <h2 className="text-sm font-semibold text-soft-gray uppercase tracking-wide mb-3">내 계정</h2>
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-mint-200 flex items-center justify-center text-mint-700 font-bold text-lg">
-              {profile.full_name.charAt(0)}
-            </div>
-            <div>
-              <p className="font-semibold text-charcoal">{profile.full_name}</p>
-              <RoleBadge role={profile.role} className="mt-1" />
-            </div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-soft-gray uppercase tracking-wide">내 계정</h2>
+            {!isEditing && (
+              <button onClick={handleEdit} className="p-1.5 rounded-lg hover:bg-gray-50 text-soft-gray hover:text-charcoal transition-colors">
+                <Pencil size={15} />
+              </button>
+            )}
           </div>
+
+          {isEditing ? (
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-soft-gray font-medium block mb-1">이름</label>
+                <input
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-charcoal focus:outline-none focus:border-mint-400"
+                  placeholder="이름을 입력하세요"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-soft-gray font-medium block mb-1">전화번호 (선택)</label>
+                <input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-charcoal focus:outline-none focus:border-mint-400"
+                  placeholder="010-0000-0000"
+                  type="tel"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-soft-gray font-medium block mb-1">역할</label>
+                <p className="text-sm text-charcoal px-3 py-2 bg-gray-50 rounded-xl">{ROLE_LABEL[profile.role]}</p>
+              </div>
+              {saveError && <p className="text-xs text-red-500">{saveError}</p>}
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving || !fullName.trim()}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-mint-400 text-white rounded-xl text-sm font-medium hover:bg-mint-500 disabled:opacity-50 transition-colors"
+                >
+                  <Check size={14} />
+                  {isSaving ? '저장 중...' : '저장'}
+                </button>
+                <button
+                  onClick={handleCancel}
+                  disabled={isSaving}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-gray-100 text-charcoal rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
+                >
+                  <X size={14} />
+                  취소
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-mint-200 flex items-center justify-center text-mint-700 font-bold text-lg flex-shrink-0">
+                {profile.full_name.charAt(0)}
+              </div>
+              <div>
+                <p className="font-semibold text-charcoal">{profile.full_name}</p>
+                {profile.phone && <p className="text-xs text-soft-gray mt-0.5">{profile.phone}</p>}
+                <RoleBadge role={profile.role} className="mt-1" />
+              </div>
+            </div>
+          )}
         </Card>
       )}
 
