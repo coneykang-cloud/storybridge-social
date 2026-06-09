@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LogOut, Contrast, Pencil, Check, X } from 'lucide-react'
+import { LogOut, Contrast, Pencil, Check, X, Mail, KeyRound } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { RoleBadge } from '@/components/ui/Badge'
 import { createClient } from '@/lib/supabase/client'
@@ -16,11 +16,18 @@ export default function SettingsPage() {
   const { highContrast, toggleHighContrast } = useUIStore()
   const { profile, fetchProfile, setProfile } = useAuthStore()
 
+  const [email, setEmail] = useState<string | null>(null)
+
+  // 프로필 편집
   const [isEditing, setIsEditing] = useState(false)
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+
+  // 비밀번호 재설정
+  const [pwResetSent, setPwResetSent] = useState(false)
+  const [pwResetLoading, setPwResetLoading] = useState(false)
 
   useEffect(() => {
     if (!profile) fetchProfile()
@@ -33,16 +40,17 @@ export default function SettingsPage() {
     }
   }, [profile])
 
-  const handleEdit = () => {
-    setSaveError(null)
-    setIsEditing(true)
-  }
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      setEmail(data.user?.email ?? null)
+    })
+  }, [])
+
+  const handleEdit = () => { setSaveError(null); setIsEditing(true) }
 
   const handleCancel = () => {
-    if (profile) {
-      setFullName(profile.full_name)
-      setPhone(profile.phone ?? '')
-    }
+    if (profile) { setFullName(profile.full_name); setPhone(profile.phone ?? '') }
     setIsEditing(false)
     setSaveError(null)
   }
@@ -59,7 +67,6 @@ export default function SettingsPage() {
         .eq('id', profile.id)
         .select()
         .single()
-
       if (error) throw error
       if (data) setProfile(data)
       setIsEditing(false)
@@ -68,6 +75,17 @@ export default function SettingsPage() {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const handlePasswordReset = async () => {
+    if (!email) return
+    setPwResetLoading(true)
+    const supabase = createClient()
+    await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/settings`,
+    })
+    setPwResetSent(true)
+    setPwResetLoading(false)
   }
 
   const handleLogout = async () => {
@@ -81,7 +99,7 @@ export default function SettingsPage() {
     <div className="px-5 py-6 max-w-xl mx-auto space-y-4">
       <h1 className="text-2xl font-bold text-charcoal mb-6">설정</h1>
 
-      {/* 내 계정 정보 */}
+      {/* 내 계정 — 프로필 정보 */}
       {profile && (
         <Card>
           <div className="flex items-center justify-between mb-3">
@@ -153,6 +171,45 @@ export default function SettingsPage() {
         </Card>
       )}
 
+      {/* 로그인 계정 정보 */}
+      <Card>
+        <h2 className="text-sm font-semibold text-soft-gray uppercase tracking-wide mb-3">로그인 계정</h2>
+        <div className="space-y-3">
+          {/* 이메일 */}
+          <div className="flex items-center gap-3">
+            <Mail size={16} className="text-soft-gray flex-shrink-0" />
+            <div>
+              <p className="text-xs text-soft-gray font-medium">이메일</p>
+              <p className="text-sm text-charcoal">{email ?? '불러오는 중...'}</p>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-100" />
+
+          {/* 비밀번호 재설정 */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <KeyRound size={16} className="text-soft-gray flex-shrink-0" />
+              <div>
+                <p className="text-xs text-soft-gray font-medium">비밀번호</p>
+                <p className="text-sm text-charcoal">••••••••</p>
+              </div>
+            </div>
+            {pwResetSent ? (
+              <span className="text-xs text-mint-600 font-medium">메일 발송됨 ✓</span>
+            ) : (
+              <button
+                onClick={handlePasswordReset}
+                disabled={pwResetLoading || !email}
+                className="text-xs text-mint-600 font-medium hover:text-mint-700 disabled:opacity-50 transition-colors"
+              >
+                {pwResetLoading ? '발송 중...' : '재설정 메일 받기'}
+              </button>
+            )}
+          </div>
+        </div>
+      </Card>
+
       {/* 접근성 */}
       <Card>
         <h2 className="text-sm font-semibold text-soft-gray uppercase tracking-wide mb-3">접근성</h2>
@@ -177,7 +234,7 @@ export default function SettingsPage() {
         </div>
       </Card>
 
-      {/* 로그아웃 */}
+      {/* 계정 관리 */}
       <Card>
         <h2 className="text-sm font-semibold text-soft-gray uppercase tracking-wide mb-3">계정 관리</h2>
         <button
@@ -189,9 +246,7 @@ export default function SettingsPage() {
         </button>
       </Card>
 
-      <p className="text-center text-xs text-soft-gray pt-4">
-        StoryBridge MVP v3.0
-      </p>
+      <p className="text-center text-xs text-soft-gray pt-4">StoryBridge MVP v3.0</p>
     </div>
   )
 }
