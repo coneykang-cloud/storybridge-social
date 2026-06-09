@@ -4,8 +4,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Home, BookPlus, BookOpen, Users, UserCircle, Settings } from 'lucide-react'
 import { clsx } from 'clsx'
-import { useAuthStore } from '@/stores/auth.store'
-
 const navItems = [
   { href: '/dashboard',    icon: Home,       label: '홈' },
   { href: '/story/create', icon: BookPlus,   label: '스토리' },
@@ -17,9 +15,6 @@ const navItems = [
 
 export function BottomNavBar() {
   const pathname = usePathname()
-  const profile = useAuthStore((s) => s.profile)
-
-  if (!profile) return null
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-100 md:hidden pb-safe">
