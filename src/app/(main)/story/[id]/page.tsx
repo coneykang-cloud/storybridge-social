@@ -1,13 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import Image from 'next/image'
 import { Play, Users, Edit2 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { RoleBadge } from '@/components/ui/Badge'
 import { DeleteStoryButton } from '@/components/story/DeleteStoryButton'
 import { EditableStoryTitle } from '@/components/story/EditableStoryTitle'
+import { StoryPageEditor } from '@/components/story/StoryPageEditor'
 import type { Story, StoryPage, Comment } from '@/types/app.types'
 
 interface Props { params: Promise<{ id: string }> }
@@ -24,7 +24,7 @@ export default async function StoryDetailPage({ params }: Props) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/signin')
 
-  const [storyRes, pagesRes, commentsRes] = await Promise.all([
+  const [storyRes, pagesRes, commentsRes, profileRes] = await Promise.all([
     supabase.from('stories')
       .select('*, children(name, age_group, parent_id)')
       .eq('id', id)
@@ -38,6 +38,7 @@ export default async function StoryDetailPage({ params }: Props) {
       .eq('story_id', id)
       .order('created_at', { ascending: false })
       .limit(3),
+    supabase.from('user_profiles').select('role').eq('id', user.id).single(),
   ])
 
   if (!storyRes.data) notFound()
@@ -49,6 +50,9 @@ export default async function StoryDetailPage({ params }: Props) {
   const child = (story as unknown as { children: { name: string; age_group: string; parent_id: string } }).children
   const isParent = child?.parent_id === user.id
   const isCreator = story.creator_id === user.id
+  const role = profileRes.data?.role as import('@/types/app.types').UserRole | undefined
+  const canEditDirectly = isParent || isCreator
+  const canPropose = role !== 'child' && !canEditDirectly
 
   return (
     <div className="px-5 py-6 max-w-xl mx-auto space-y-5 pb-24">
@@ -87,22 +91,20 @@ export default async function StoryDetailPage({ params }: Props) {
         <h2 className="text-base font-semibold text-charcoal mb-3">
           페이지 미리보기 ({pages.length}페이지)
         </h2>
-        <div className="flex gap-3 overflow-x-auto pb-2 -mx-5 px-5">
+        {canPropose && !canEditDirectly && (
+          <p className="text-xs text-soft-gray mb-2">
+            ✏️ 연필 아이콘을 눌러 페이지 내용을 수정 제안할 수 있어요. 보낸 제안은 보호자 승인 후 반영돼요.
+          </p>
+        )}
+        <div className="space-y-2">
           {pages.map((page) => (
-            <div key={page.id} className="shrink-0 w-36">
-              <div className="aspect-square rounded-xl bg-mint-100 flex items-center justify-center mb-1 overflow-hidden">
-                {page.image_url ? (
-                  <Image src={page.image_url} alt={`페이지 ${page.page_number}`}
-                    width={144} height={144} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-2xl">📖</span>
-                )}
-              </div>
-              <p className="text-xs text-soft-gray text-center">{page.page_number}페이지</p>
-              <p className="text-xs text-charcoal line-clamp-2 text-center mt-0.5">
-                {page.descriptive?.slice(0, 30)}...
-              </p>
-            </div>
+            <StoryPageEditor
+              key={page.id}
+              storyId={id}
+              page={page}
+              canEditDirectly={canEditDirectly}
+              canPropose={canPropose}
+            />
           ))}
         </div>
       </section>

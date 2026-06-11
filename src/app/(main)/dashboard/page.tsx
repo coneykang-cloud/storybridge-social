@@ -25,7 +25,7 @@ export default async function DashboardPage() {
 
   const childIds = (myChildren ?? []).map((c: { id: string }) => c.id)
 
-  const [profileRes, storiesRes, pendingRes] = await Promise.all([
+  const [profileRes, storiesRes, pendingRes, unreadRes] = await Promise.all([
     supabase.from('user_profiles').select('*').eq('id', user.id).single(),
     childIds.length > 0
       ? supabase.from('stories')
@@ -39,11 +39,13 @@ export default async function DashboardPage() {
           .order('updated_at', { ascending: false })
           .limit(6),
     supabase.from('approvals').select('id').eq('status', 'pending'),
+    supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('is_read', false),
   ])
 
   const profile = profileRes.data as UserProfile | null
   const stories = (storiesRes.data ?? []) as Story[]
   const pendingCount = pendingRes.data?.length ?? 0
+  const unreadCount = unreadRes.count ?? 0
 
   return (
     <div className="px-5 py-6 max-w-2xl mx-auto space-y-6">
@@ -73,9 +75,25 @@ export default async function DashboardPage() {
               <span className="text-2xl">🔴</span>
               <div>
                 <p className="font-semibold text-charcoal text-sm">승인 대기 {pendingCount}건</p>
-                <p className="text-xs text-soft-gray">전문가의 수정 제안이 있어요</p>
+                <p className="text-xs text-soft-gray break-keep">전문가의 수정 제안이 있어요</p>
               </div>
               <span className="ml-auto text-coral-500 text-sm font-medium">확인하기 →</span>
+            </div>
+          </Card>
+        </Link>
+      )}
+
+      {/* 안 읽은 알림 배너 (전체 역할) */}
+      {unreadCount > 0 && (
+        <Link href="/notifications">
+          <Card className="border-mint-300 bg-mint-50 hover:bg-mint-100/60 transition-colors">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🔔</span>
+              <div>
+                <p className="font-semibold text-charcoal text-sm">안 읽은 알림 {unreadCount}건</p>
+                <p className="text-xs text-soft-gray break-keep">수정 제안·처리 결과를 확인해 보세요</p>
+              </div>
+              <span className="ml-auto text-mint-700 text-sm font-medium">확인하기 →</span>
             </div>
           </Card>
         </Link>

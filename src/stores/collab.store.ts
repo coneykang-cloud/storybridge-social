@@ -1,21 +1,20 @@
 import { create } from 'zustand'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimeChannel } from '@supabase/supabase-js'
-import type { Approval, Comment, Notification } from '@/types/app.types'
+import type { Approval, Comment } from '@/types/app.types'
 
 interface CollabStore {
   pendingApprovals: Approval[]
+  approvalHistory: Approval[]
   comments: Comment[]
-  notifications: Notification[]
   channel: RealtimeChannel | null
 
   setPendingApprovals: (approvals: Approval[]) => void
+  setApprovalHistory: (approvals: Approval[]) => void
   setComments: (comments: Comment[]) => void
   addComment: (comment: Comment) => void
-  addNotification: (n: Notification) => void
-  markNotificationsRead: () => void
 
-  connectToGroup: (groupId: string, childId: string) => void
+  connectToGroup: (groupId: string, storyIds: string[]) => void
   disconnectFromGroup: () => void
 
   fetchPendingApprovals: (storyId?: string) => Promise<void>
@@ -30,61 +29,49 @@ interface CollabStore {
 
 export const useCollabStore = create<CollabStore>((set, get) => ({
   pendingApprovals: [],
+  approvalHistory: [],
   comments: [],
   notifications: [],
   channel: null,
 
   setPendingApprovals: (approvals) => set({ pendingApprovals: approvals }),
+  setApprovalHistory: (approvals) => set({ approvalHistory: approvals }),
   setComments: (comments) => set({ comments }),
 
   addComment: (comment) =>
     set((state) => ({ comments: [...state.comments, comment] })),
 
-  addNotification: (n) =>
-    set((state) => ({ notifications: [n, ...state.notifications] })),
-
-  markNotificationsRead: () =>
-    set((state) => ({
-      notifications: state.notifications.map((n) => ({ ...n, is_read: true })),
-    })),
-
-  connectToGroup: (groupId, childId) => {
+  connectToGroup: (groupId, storyIds) => {
     const supabase = createClient()
     const existing = get().channel
     if (existing) supabase.removeChannel(existing)
 
-    const channel = supabase
-      .channel(`group:${groupId}`)
-      .on(
+    let channel = supabase.channel(`group:${groupId}`)
+
+    if (storyIds.length > 0) {
+      channel = channel.on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'approvals', filter: `story_id=eq.${childId}` },
+        { event: 'INSERT', schema: 'public', table: 'approvals', filter: `story_id=in.(${storyIds.join(',')})` },
         (payload) => {
           const approval = payload.new as Approval
           if (approval.status === 'pending') {
             set((state) => ({
               pendingApprovals: [approval, ...state.pendingApprovals],
             }))
-            get().addNotification({
-              id: approval.id,
-              type: 'approval_request',
-              title: '수정 제안',
-              body: '전문가가 수정 제안을 보냈어요',
-              story_id: approval.story_id,
-              is_read: false,
-              created_at: approval.created_at,
-            })
           }
         }
       )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'comments' },
-        (payload) => {
-          get().addComment(payload.new as Comment)
-        }
-      )
-      .subscribe()
+    }
 
+    channel = channel.on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'comments' },
+      (payload) => {
+        get().addComment(payload.new as Comment)
+      }
+    )
+
+    channel.subscribe()
     set({ channel })
   },
 
@@ -121,13 +108,21 @@ export const useCollabStore = create<CollabStore>((set, get) => ({
   },
 
   resolveApproval: async (id, status, feedback) => {
-    await fetch('/api/approval', {
+    const res = await fetch('/api/approval', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, status, feedback }),
     })
-    set((state) => ({
-      pendingApprovals: state.pendingApprovals.filter((a) => a.id !== id),
-    }))
+    const updated = res.ok ? ((await res.json()).approval as Approval) : null
+
+    set((state) => {
+      const target = state.pendingApprovals.find((a) => a.id === id)
+      return {
+        pendingApprovals: state.pendingApprovals.filter((a) => a.id !== id),
+        approvalHistory: target
+          ? [{ ...target, ...updated }, ...state.approvalHistory]
+          : state.approvalHistory,
+      }
+    })
   },
 }))

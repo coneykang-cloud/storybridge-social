@@ -29,21 +29,34 @@ export default async function CollabPage({ params }: Props) {
 
   const isParent = profile?.role === 'parent'
 
-  const [membersRes, approvalsRes, commentsRes] = await Promise.all([
+  const [membersRes, approvalsRes, historyRes, commentsRes, storiesRes] = await Promise.all([
     supabase
       .from('group_members')
       .select('role, joined_at, user:user_profiles(id, full_name, role)')
       .eq('group_id', groupId),
     supabase
       .from('approvals')
-      .select('*, requester:user_profiles(id, full_name, role)')
+      .select('*, requester:user_profiles(id, full_name, role), story:stories!inner(child_id)')
       .eq('status', 'pending')
+      .eq('story.child_id', group.child_id)
       .order('created_at', { ascending: false }),
+    supabase
+      .from('approvals')
+      .select('*, requester:user_profiles(id, full_name, role), story:stories!inner(child_id)')
+      .neq('status', 'pending')
+      .eq('story.child_id', group.child_id)
+      .order('resolved_at', { ascending: false }),
     supabase
       .from('comments')
       .select('*, author:user_profiles(id, full_name, role)')
       .order('created_at', { ascending: true }),
+    supabase
+      .from('stories')
+      .select('id')
+      .eq('child_id', group.child_id),
   ])
+
+  const storyIds = (storiesRes.data ?? []).map((s) => s.id as string)
 
   return (
     <div className="px-5 py-6 max-w-xl mx-auto">
@@ -55,11 +68,12 @@ export default async function CollabPage({ params }: Props) {
 
       <CollabPageClient
         groupId={groupId}
-        childId={group.child_id}
+        storyIds={storyIds}
         currentUserId={user.id}
         isParent={isParent}
         members={(membersRes.data ?? []) as unknown as { role: string; joined_at: string; user: { id: string; full_name: string; role: string } }[]}
         initialApprovals={(approvalsRes.data ?? []) as Approval[]}
+        initialApprovalHistory={(historyRes.data ?? []) as Approval[]}
         initialComments={(commentsRes.data ?? []) as Comment[]}
       />
     </div>

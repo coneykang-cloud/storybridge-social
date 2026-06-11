@@ -17,6 +17,7 @@ const navItems = [
   { href: '/story/create',  icon: BookPlus,       label: '스토리 만들기' },
   { href: '/bookshelf',     icon: BookOpen,       label: '브릿지 책장' },
   { href: '/collab',        icon: Users,          label: '협업 공간' },
+  { href: '/notifications', icon: Bell,           label: '알림' },
   { href: '/settings',      icon: Settings,       label: '설정' },
 ]
 
@@ -24,10 +25,11 @@ const CHILD_NAV_HREFS = ['/bookshelf', '/settings']
 
 interface SideBarProps {
   pendingCount?: number
+  unreadCount?: number
   role?: UserRole | null
 }
 
-export function SideBar({ pendingCount = 0, role }: SideBarProps) {
+export function SideBar({ pendingCount = 0, unreadCount = 0, role }: SideBarProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -74,6 +76,9 @@ export function SideBar({ pendingCount = 0, role }: SideBarProps) {
               <span>{label}</span>
               {href === '/collab' && pendingCount > 0 && (
                 <Badge variant="count" className="ml-auto">{pendingCount}</Badge>
+              )}
+              {href === '/notifications' && unreadCount > 0 && (
+                <Badge variant="count" className="ml-auto">{unreadCount}</Badge>
               )}
             </Link>
           )

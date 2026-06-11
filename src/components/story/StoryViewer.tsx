@@ -105,7 +105,7 @@ export function StoryViewer({
       )}
 
       {/* 메인: 이미지(좌) + 텍스트(우) */}
-      <div className="flex-1 flex flex-col md:flex-row items-center gap-6 px-6 pb-4 min-h-0">
+      <div className="flex-1 flex flex-col md:flex-row items-center gap-6 px-6 pb-4 min-h-0 overflow-y-auto">
 
         {/* 이미지 영역 */}
         <div className="w-full md:w-[48%] flex-shrink-0">
@@ -132,7 +132,7 @@ export function StoryViewer({
         </div>
 
         {/* 텍스트 영역 */}
-        <div className="w-full md:w-[52%] flex flex-col justify-center min-h-0">
+        <div className="w-full md:w-[52%] flex flex-col justify-center">
 
           {/* 청킹 표지어 */}
           {page.chunking_label && (

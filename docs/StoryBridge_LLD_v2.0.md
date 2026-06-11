@@ -1,10 +1,10 @@
 # StoryBridge LLD (Low-Level Design) v2.0
 
-**버전:** v2.5  
-**작성일:** 2026.06.05 / 최종 업데이트: 2026.06.08  
+**버전:** v2.6  
+**작성일:** 2026.06.05 / 최종 업데이트: 2026.06.09  
 **작성자:** 강현정  
-**참조:** PRD v3.4 / HLD v2.4 / TDD v1.4 / Plan v2.4.md  
-**변경 이력:** v1.0 → v2.0 (3-Track 모델, 청킹 2차원화, 누적 제시 UI 반영) / v2.0 → v2.1 (연령대 5구간, migration 004, ChildSelectorPanel, 타입 업데이트) / v2.1 → v2.2 (migration 004 실행 완료로 상태 정정, migration 005 stories DELETE RLS 정책 추가 반영) / v2.2 → v2.3 (behavior_observations 테이블 설계 및 API 추가) / v2.3 → v2.4 (마이그레이션 007~013 반영, 브릿지 책장·제목 인라인 수정·creator 삭제 권한 등 코드 구현 동기화) / v2.4 → v2.5 (이미지 생성 파이프라인 Replicate 전환 + 아바타 기반 캐릭터 일관성 함수 명세, TTS API·서비스 신규 추가 및 버그 수정 3건 반영)
+**참조:** PRD v3.5 / HLD v2.5 / TDD v1.5 / Plan v2.6.md  
+**변경 이력:** v1.0 → v2.0 (3-Track 모델, 청킹 2차원화, 누적 제시 UI 반영) / v2.0 → v2.1 (연령대 5구간, migration 004, ChildSelectorPanel, 타입 업데이트) / v2.1 → v2.2 (migration 004 실행 완료로 상태 정정, migration 005 stories DELETE RLS 정책 추가 반영) / v2.2 → v2.3 (behavior_observations 테이블 설계 및 API 추가) / v2.3 → v2.4 (마이그레이션 007~013 반영, 브릿지 책장·제목 인라인 수정·creator 삭제 권한 등 코드 구현 동기화) / v2.4 → v2.5 (이미지 생성 파이프라인 Replicate 전환 + 아바타 기반 캐릭터 일관성 함수 명세, TTS API·서비스 신규 추가 및 버그 수정 3건 반영) / v2.5 → v2.6 (아이(child) 역할 — migration 014, UserRole 타입 확장, 미들웨어 child 보호 로직, SideBar/BottomNavBar 필터링, BookshelfClient ChildConnectForm, 그룹 참여 API child 허용, Badge/Settings 컴포넌트 child 지원)
 
 ---
 
@@ -23,13 +23,14 @@
 
 ## 1. 데이터베이스 스키마 상세
 
-### 1.1 user_profiles (변경 없음)
+### 1.1 user_profiles
 
 ```sql
 CREATE TABLE public.user_profiles (
   id           UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name    TEXT NOT NULL,
-  role         TEXT NOT NULL CHECK (role IN ('parent', 'therapist', 'teacher')),
+  role         TEXT NOT NULL CHECK (role IN ('parent', 'therapist', 'teacher', 'child')),
+  -- ↑ migration 014 (2026-06-09): 'child' 추가
   phone        TEXT,
   created_at   TIMESTAMPTZ DEFAULT NOW(),
   updated_at   TIMESTAMPTZ DEFAULT NOW()
@@ -186,7 +187,8 @@ CREATE TABLE public.approvals (
 | `008_observations_shared_access.sql` | 같은 아이에 접근권 있는 그룹 멤버는 작성자 무관 조회 가능; 치료사는 타인 기록의 SEAT 분류·대체행동 필드도 수정 가능하도록 SELECT/UPDATE 정책 확장 | ✅ 실행 완료 (2026-06-08) |
 | `009~011_groups_rls_policies*.sql` | groups/group_members RLS 시행착오 (deny-all → 무한 재귀 2종 → 롤백) | ✅ 실행 완료 (최종본 012로 대체) |
 | `012_groups_rls_policies_v3.sql` | groups/group_members 최종 RLS — `is_group_member()`/`is_child_parent()`를 `LANGUAGE plpgsql SECURITY DEFINER` 헬퍼로 분리해 cross-table 순환 해결 | ✅ 실행 완료 (2026-06-08) |
-| `013_stories_delete_creator.sql` | stories DELETE RLS에 `creator_id = auth.uid()` 조건 추가 (치료사 등 creator의 본인 생성 스토리 삭제 허용) | ⏳ Supabase SQL Editor 실행 대기 |
+| `013_stories_delete_creator.sql` | stories DELETE RLS에 `creator_id = auth.uid()` 조건 추가 (치료사 등 creator의 본인 생성 스토리 삭제 허용) | ✅ 실행 완료 (2026-06-08) |
+| `014_add_child_role.sql` | `user_profiles.role` 및 `group_members.role` CHECK 제약에 'child' 추가 — child 역할 회원가입 가능하도록 | ✅ 실행 완료 (2026-06-09) |
 
 ### 1.7 v2 추가 마이그레이션 SQL
 
@@ -851,7 +853,7 @@ interface DeleteStoryButtonProps {
 - **노출 조건 (v2.3 변경):** `isParent || isCreator` (기존엔 `isParent`만 — 치료사·교사가 만든 스토리는 삭제 버튼 자체가 없었음)
 - `isParent` 판별 시 주의: Supabase join 결과는 `story.children`로 반환되므로 `story.child`로 접근하면 항상 `undefined`가 되어 `isParent`가 거짓이 되는 버그가 있었음(2026-06-07 수정)
 
-### 3.14 BookshelfClient — NEW v2.3 ("브릿지 책장")
+### 3.14 BookshelfClient — v2.3 → v2.6 업데이트 ("브릿지 책장")
 
 ```typescript
 interface BookshelfClientProps {
@@ -859,6 +861,7 @@ interface BookshelfClientProps {
     children: { name: string; age_group: AgeGroup } | null
     story_pages: { image_url: string | null; page_number: number }[]
   })[]
+  userRole?: UserRole | null  // v2.6 추가: child 모드 분기에 사용
 }
 ```
 
@@ -867,6 +870,92 @@ interface BookshelfClientProps {
 - 카드 그리드: 표지 이미지(첫 페이지) · 제목 · `<TrackBadge>` · 아동명 · 페이지 수 · 작성일(상대 표기)
 - 빈 상태: "아직 만든 스토리가 없어요" / 필터 결과 없음 메시지 분리
 - 서버 컴포넌트(`/bookshelf/page.tsx`)에서 `stories.select('*, children(name, age_group), story_pages(image_url, page_number)')`를 **앱 레벨 필터 없이** RLS만으로 조회 → 본인 소유 + 그룹으로 연결된 스토리가 자동으로 모두 포함됨, `updated_at desc` 정렬
+
+**v2.6 child 모드 추가:**
+- 서버 컴포넌트에서 `user_profiles.role`을 `Promise.all`로 병렬 조회해 `userRole` prop 전달
+- `isChild = userRole === 'child'` 플래그로 분기:
+  - 빈 상태 시: "스토리 만들기" CTA 버튼 숨김 → 대신 "초대 코드를 입력하면 내 이야기가 여기에 나타나요" 안내
+  - 스토리 목록 상단: `<ChildConnectForm />` 항상 표시
+  - 부제목: "나를 위해 만들어진 이야기를 읽어보세요" (일반 사용자와 다른 문구)
+
+### 3.15 ChildConnectForm — NEW v2.6 (BookshelfClient 내부 컴포넌트)
+
+```typescript
+// BookshelfClient.tsx 내부에 선언된 클라이언트 컴포넌트
+function ChildConnectForm() {
+  const [code, setCode] = useState('')
+  const [msg, setMsg] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+
+  const join = async () => {
+    const res = await fetch('/api/group', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invite_code: code.trim() }),
+    })
+    const data = await res.json()
+    if (res.ok) {
+      setMsg('연결됐어요! 이제 내 이야기를 볼 수 있어요 🎉')
+      window.location.reload()  // 스토리 목록 새로고침
+    } else {
+      setMsg(data.error ?? '연결에 실패했어요. 코드를 다시 확인해 주세요.')
+    }
+  }
+}
+```
+
+**POST /api/group 변경사항 (v2.6):**
+- 기존: `if (!profile || profile.role === 'parent') → 403` (보호자·없는 유저 차단)
+- 변경: child를 포함한 나머지 역할(therapist, teacher, child)은 모두 초대 코드 참여 허용
+- child는 협업 공간(`/collab`)에 접근할 수 없으므로 BookshelfClient에 별도 UI 제공
+
+### 3.16 미들웨어 child 보호 로직 — NEW v2.6
+
+```typescript
+// src/lib/supabase/middleware.ts
+
+// 로그인 직후 리다이렉트
+if (user && isAuthRoute) {
+  const role = user.user_metadata?.role as string | undefined
+  url.pathname = role === 'child' ? '/bookshelf' : '/dashboard'
+  return NextResponse.redirect(url)
+}
+
+// child 역할: 허용 경로 외 모두 /bookshelf로 차단
+if (user && !isApiRoute) {
+  const role = user.user_metadata?.role as string | undefined
+  const CHILD_ALLOWED = ['/bookshelf', '/settings', '/story']  // /story는 읽기 전용
+  const CHILD_BLOCKED = ['/story/create']                       // 생성 페이지만 명시적 차단
+  if (
+    role === 'child' &&
+    (!CHILD_ALLOWED.some(p => pathname.startsWith(p)) ||
+      CHILD_BLOCKED.some(p => pathname.startsWith(p)))
+  ) {
+    url.pathname = '/bookshelf'
+    return NextResponse.redirect(url)
+  }
+}
+```
+
+### 3.17 SideBar/BottomNavBar child 필터링 — NEW v2.6
+
+```typescript
+// SideBar.tsx
+const CHILD_NAV_HREFS = ['/bookshelf', '/settings']
+// render:
+{(role === 'child'
+  ? navItems.filter(i => CHILD_NAV_HREFS.includes(i.href))
+  : navItems
+).map(item => <NavItem key={item.href} {...item} />)}
+
+// BottomNavBar.tsx
+export function BottomNavBar({ role }: { role?: UserRole | null }) {
+  const visibleItems = role === 'child'
+    ? navItems.filter(i => CHILD_NAV_HREFS.includes(i.href))
+    : navItems
+}
+// MainLayout에서 <BottomNavBar role={role} /> 전달
+```
 
 ---
 
@@ -1139,7 +1228,8 @@ storybridge/src/
 
 // ── 기본 타입 ────────────────────────────────────────────────
 
-export type UserRole = 'parent' | 'therapist' | 'teacher'
+export type UserRole = 'parent' | 'therapist' | 'teacher' | 'child'
+// ↑ v2.6: 'child' 추가 (migration 014과 함께 적용)
 export type AvatarStyle = 'ghibli' | 'realistic' | 'pixar' | 'watercolor'
 export type AgeGroup = '5-6' | '7-9' | '10-12' | '13-15' | '16-18'
 // v2.1: 3구간 → 5구간 (미취학 추가, 10~12/13~15/16~18 분리)
@@ -1379,4 +1469,20 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 ---
 
-*StoryBridge LLD v2.5 | 2026.06.08*
+---
+
+## v2.5 → v2.6 변경 요약 (2026.06.09)
+
+| 섹션 | 변경 내용 |
+|---|---|
+| §1.1 DB user_profiles | role CHECK 제약에 'child' 추가 (migration 014) |
+| §1.6 마이그레이션 | migration 013 실행 완료 상태 정정; migration 014(`014_add_child_role.sql`) 행 신규 추가 |
+| §3.14 BookshelfClient | `userRole` prop 추가, child 모드(ChildConnectForm, 빈 상태 분기, 부제목) 명세 |
+| §3.15 ChildConnectForm (신규) | BookshelfClient 내부 컴포넌트 — 초대 코드 입력 → `POST /api/group` → 스토리 목록 리로드 |
+| §3.16 미들웨어 child 보호 로직 (신규) | CHILD_ALLOWED/CHILD_BLOCKED 배열 기반 경로 보호; child 로그인 후 /bookshelf 리다이렉트 |
+| §3.17 SideBar/BottomNavBar 필터링 (신규) | CHILD_NAV_HREFS = ['/bookshelf', '/settings'], child는 2개 메뉴만 렌더링 |
+| §7 타입 | `UserRole`에 `'child'` 추가; `RECORDER_ROLE_META` child 항목 추가 |
+
+---
+
+*StoryBridge LLD v2.6 | 2026.06.09*

@@ -1,9 +1,9 @@
 # StoryBridge Technical Design Document (TDD)
 
-**버전:** v1.4  
-**작성일:** 2026.06.05 / 최종 업데이트: 2026.06.08  
+**버전:** v1.5  
+**작성일:** 2026.06.05 / 최종 업데이트: 2026.06.09  
 **작성자:** 강현정  
-**참조:** PRD v3.4 / HLD v2.4 / LLD v2.5 / Plan v2.4
+**참조:** PRD v3.5 / HLD v2.5 / LLD v2.6 / Plan v2.6
 
 ---
 
@@ -166,9 +166,12 @@ IDE: VSCode / Claude Code
 │   ├── /create/pool        템플릿 선택
 │   ├── /[id]               스토리 상세
 │   └── /[id]/view          스토리 뷰어 (3모드)
-├── /collab                 협업 공간 목록
-├── /collab/[groupId]       그룹 협업 (승인·댓글)
+├── /collab                 협업 공간 목록 (child 접근 차단)
+├── /collab/[groupId]       그룹 협업 (승인·댓글, child 접근 차단)
+├── /bookshelf              브릿지 책장 (child 전용 진입점 포함)
 └── /settings               설정 (로그아웃, 고대비)
+
+> **v1.5 child 역할 접근 경로:** `/bookshelf`, `/settings`, `/story/[id]`(읽기 전용) — 그 외는 미들웨어에서 `/bookshelf`로 강제 리다이렉트. `/story/create`는 CHILD_BLOCKED 목록으로 명시적 차단.
 ```
 
 ### 4.2 렌더링 전략
@@ -483,6 +486,7 @@ API 레이어 검증:
   아바타 생성·삭제 → parent만 허용
   승인 처리 → parent만 허용
   청킹 전략 수정 → therapist만 허용
+  그룹 참여(초대 코드) → therapist/teacher/child 허용, parent는 403 차단
 
 RLS 레이어 검증 (DB 레벨):
   children → parent_id = auth.uid() OR group member
@@ -490,6 +494,13 @@ RLS 레이어 검증 (DB 레벨):
   avatars → parent 소유자
   approvals → 요청자 OR 보호자
   comments → group member 전체
+  user_profiles.role → CHECK ('parent','therapist','teacher','child') — migration 014
+  group_members.role → CHECK ('parent','therapist','teacher','child') — migration 014
+
+미들웨어 레이어 검증 (경로 보호):
+  child 역할 → /bookshelf, /settings, /story/* (읽기) 허용
+  child 역할 → /story/create 포함 나머지 경로 → /bookshelf로 리다이렉트
+  child 로그인 → /dashboard 대신 /bookshelf로 자동 이동
 ```
 
 ### 8.3 보안 고려사항
@@ -881,5 +892,16 @@ D:\2. 연세대학원\workspace_app\storybridge\
 
 ---
 
-*StoryBridge TDD v1.4 | 2026.06.08*  
+---
+
+## v1.4 → v1.5 변경 요약 (2026.06.09)
+
+| 섹션 | 변경 내용 |
+|---|---|
+| §8.2 RBAC | child 역할 추가 — 그룹 참여 허용 조건, DB CHECK 제약 업데이트(migration 014), 미들웨어 경로 보호 로직 명시 |
+| §4.1 라우팅 | child 역할 접근 가능 경로(`/bookshelf`, `/settings`, `/story/[id]`)와 차단 경로(`/story/create`, `/dashboard` 등) 명시 |
+
+---
+
+*StoryBridge TDD v1.5 | 2026.06.09*  
 *연세대학교 심리과학이노베이션대학원 디지털혁신 트랙 — 강현정*

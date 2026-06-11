@@ -58,6 +58,14 @@ export function ApprovalCard({ approval, isParent }: ApprovalCardProps) {
       {/* Diff */}
       <DiffViewer before={approval.diff_before} after={approval.diff_after} />
 
+      {/* 제안 사유 */}
+      {approval.proposal_reason && (
+        <div className="mt-3 p-3 rounded-lg bg-mint-50 border border-mint-200">
+          <p className="text-xs text-mint-700 font-medium mb-1">제안 사유</p>
+          <p className="text-sm text-charcoal leading-relaxed">{approval.proposal_reason}</p>
+        </div>
+      )}
+
       {/* 보호자 전용 승인/거절 버튼 */}
       {isParent && (
         <div className="mt-4 space-y-2">

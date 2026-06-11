@@ -1,10 +1,10 @@
 # StoryBridge HLD (High-Level Design) v2.0
 
-**버전:** v2.4  
-**작성일:** 2026.06.05 / 최종 업데이트: 2026.06.08  
+**버전:** v2.5  
+**작성일:** 2026.06.05 / 최종 업데이트: 2026.06.09  
 **작성자:** 강현정  
-**참조:** StoryBridge_PRD_v3_4.md  
-**변경 이력:** v1.0 → v2.0 (3-Track 모델, 청킹 2차원화, 누적 제시 UI 반영) / v2.0 → v2.1 (사이드바 역할 배지 구현, ChildSelectorPanel 추가, /profile 라우트, 연령대 5구간) / v2.1 → v2.2 (행동 관찰하기 Observation 모듈 추가, ABC→Track A 데이터 플로우, SEAT AI 파이프라인 추가) / v2.2 → v2.3 (브릿지 책장 라우트, AI 제목 자동 생성·인라인 수정, creator 기반 수정·삭제 권한 + RLS 정책 동기화, ABC→Track A 매핑을 raw_input 실제 순서로 수정) / v2.3 → v2.4 (이미지 생성 Pollinations/DALL·E 3 → Replicate FLUX 전환 및 아바타 기반 캐릭터 일관성 도입, Google TTS 버그 수정 — enableTimePointing 필드 제거 및 service-role 캐싱)
+**참조:** StoryBridge_PRD_v3_5.md  
+**변경 이력:** v1.0 → v2.0 (3-Track 모델, 청킹 2차원화, 누적 제시 UI 반영) / v2.0 → v2.1 (사이드바 역할 배지 구현, ChildSelectorPanel 추가, /profile 라우트, 연령대 5구간) / v2.1 → v2.2 (행동 관찰하기 Observation 모듈 추가, ABC→Track A 데이터 플로우, SEAT AI 파이프라인 추가) / v2.2 → v2.3 (브릿지 책장 라우트, AI 제목 자동 생성·인라인 수정, creator 기반 수정·삭제 권한 + RLS 정책 동기화, ABC→Track A 매핑을 raw_input 실제 순서로 수정) / v2.3 → v2.4 (이미지 생성 Pollinations/DALL·E 3 → Replicate FLUX 전환 및 아바타 기반 캐릭터 일관성 도입, Google TTS 버그 수정 — enableTimePointing 필드 제거 및 service-role 캐싱) / v2.4 → v2.5 (아이(child) 역할 추가 — 역할 구조 RBAC 확장, 미들웨어 child 전용 리다이렉트 로직, SideBar/BottomNavBar nav 필터링, BookshelfClient ChildConnectForm, 그룹 참여 API child 허용)
 
 ---
 
@@ -315,21 +315,32 @@ Track A 생성 화면 자동 입력 후 스토리 생성
 Supabase Auth Users (user_metadata.role 저장)
         │
         ▼
-MainLayout (Server Component)
-  supabase.auth.getUser() → user_metadata.role
-  → <SideBar role={role} /> prop 전달 (역할 배지 표시)
+Middleware (updateSession) — DB 조회 없이 JWT user_metadata.role 사용
+  - child  → 로그인 후 /bookshelf로 리다이렉트
+  - others → 로그인 후 /dashboard로 리다이렉트
+  - child가 /bookshelf, /settings, /story 이외 경로 접근 시 → /bookshelf 강제 리다이렉트
+  - child가 /story/create 접근 시 → /bookshelf 강제 리다이렉트 (CHILD_BLOCKED)
         │
         ▼
-user_profiles 테이블 (role: parent | therapist | teacher)
+MainLayout (Server Component)
+  supabase.auth.getUser() → user_metadata.role
+  → <SideBar role={role} /> prop 전달 (역할 배지 표시, child는 2개 메뉴만 표시)
+  → <BottomNavBar role={role} /> prop 전달 (child는 2개 메뉴만 표시)
+        │
+        ▼
+user_profiles 테이블 (role: parent | therapist | teacher | child)  ← v2.5: child 추가
         │
         ▼
 Track 접근 권한:
-  parent    → Track B 생성, 최종 승인권
-  therapist → Track A 생성, 청킹 전략 수정 권한
-  teacher   → Track C 생성
+  parent    → Track B 생성, 최종 승인권, 협업 공간
+  therapist → Track A 생성, 청킹 전략 수정 권한, 협업 공간
+  teacher   → Track C 생성, 협업 공간
+  child     → 브릿지 책장 열람(읽기 전용), 초대 코드로 그룹 참여, 설정
+              (스토리 생성·수정·삭제·협업 공간·대시보드 접근 모두 차단)
 ```
 
 > **v2.1 구현 방식:** SideBar 역할 배지는 Zustand store 대신 MainLayout 서버 컴포넌트에서 `user_metadata.role`을 직접 읽어 prop으로 전달. 클라이언트 초기화 타이밍 이슈 완전 해소.
+> **v2.5 구현 방식:** 미들웨어에서 child 역할 감지 시 DB 조회 없이 JWT `user_metadata.role`만으로 즉시 리다이렉트 — 성능 최적화.
 
 ### 5.2 청킹 전략 권한 (NEW v2)
 
@@ -350,6 +361,17 @@ Track 접근 권한:
 | Track B | parent만 |
 | Track C | teacher만 |
 | Pool 기반 | 세 역할 모두 |
+
+> **child 역할은 Track 없음:** `/story/create` 접속 자체가 미들웨어에서 차단됨. `TRACK_PAGES`가 `Partial<Record<UserRole, string>>`으로 선언되어 있어 child는 Track 분기 없이 생성 금지 처리.
+
+### 5.5 그룹 참여 권한 — v2.5 변경
+
+| 역할 | 그룹 참여 방법 | 비고 |
+|---|---|---|
+| parent | 참여 불가 (그룹 생성자) | `POST /api/group` → 403 반환 |
+| therapist | 협업 공간 → 초대 코드 입력 | `/collab` 페이지의 JoinGroupForm |
+| teacher | 협업 공간 → 초대 코드 입력 | `/collab` 페이지의 JoinGroupForm |
+| child | 브릿지 책장 → 초대 코드 입력 | `/bookshelf` 내 ChildConnectForm (협업 공간 접근 불가이므로 별도 UI 제공) |
 
 ### 5.4 스토리 수정·삭제 권한 — NEW v2.3
 

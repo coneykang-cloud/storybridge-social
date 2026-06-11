@@ -5,6 +5,7 @@ import { Users } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { RoleBadge } from '@/components/ui/Badge'
 import { ApprovalCard } from '@/components/collab/ApprovalCard'
+import { ApprovalHistoryCard } from '@/components/collab/ApprovalHistoryCard'
 import { CommentThread } from '@/components/collab/CommentThread'
 import { useCollabStore } from '@/stores/collab.store'
 import type { Approval, Comment } from '@/types/app.types'
@@ -17,23 +18,24 @@ interface Member {
 
 interface Props {
   groupId: string
-  childId: string
+  storyIds: string[]
   currentUserId: string
   isParent: boolean
   members: Member[]
   initialApprovals: Approval[]
+  initialApprovalHistory: Approval[]
   initialComments: Comment[]
 }
 
-type TabKey = 'approvals' | 'comments' | 'members'
+type TabKey = 'approvals' | 'history' | 'comments' | 'members'
 
 export function CollabPageClient({
-  groupId, childId, currentUserId, isParent,
-  members, initialApprovals, initialComments,
+  groupId, storyIds, currentUserId, isParent,
+  members, initialApprovals, initialApprovalHistory, initialComments,
 }: Props) {
   const {
-    pendingApprovals, comments,
-    setPendingApprovals, setComments, addComment,
+    pendingApprovals, approvalHistory, comments,
+    setPendingApprovals, setApprovalHistory, setComments, addComment,
     connectToGroup, disconnectFromGroup,
   } = useCollabStore()
 
@@ -41,8 +43,9 @@ export function CollabPageClient({
 
   useEffect(() => {
     setPendingApprovals(initialApprovals)
+    setApprovalHistory(initialApprovalHistory)
     setComments(initialComments)
-    connectToGroup(groupId, childId)
+    connectToGroup(groupId, storyIds)
     return () => disconnectFromGroup()
   }, [groupId])
 
@@ -60,6 +63,7 @@ export function CollabPageClient({
 
   const tabs: { key: TabKey; label: string; badge?: number }[] = [
     { key: 'approvals', label: '승인 요청', badge: isParent ? pendingApprovals.length : undefined },
+    { key: 'history',   label: '승인 내역' },
     { key: 'comments',  label: '자문 댓글' },
     { key: 'members',   label: '멤버' },
   ]
@@ -99,6 +103,22 @@ export function CollabPageClient({
           ) : (
             pendingApprovals.map((approval) => (
               <ApprovalCard key={approval.id} approval={approval} isParent={isParent} />
+            ))
+          )}
+        </div>
+      )}
+
+      {/* 승인 내역 탭 */}
+      {tab === 'history' && (
+        <div className="space-y-3">
+          {approvalHistory.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-4xl mb-3">📋</p>
+              <p className="font-medium text-charcoal">아직 처리된 승인 내역이 없어요</p>
+            </div>
+          ) : (
+            approvalHistory.map((approval) => (
+              <ApprovalHistoryCard key={approval.id} approval={approval} />
             ))
           )}
         </div>

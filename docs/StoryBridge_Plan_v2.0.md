@@ -1,10 +1,10 @@
 # StoryBridge 구현 계획 (Implementation Plan) v2.0
 
-**버전:** v2.5  
+**버전:** v2.6  
 **작성일:** 2026.06.05 / 최종 업데이트: 2026.06.09  
 **작성자:** 강현정  
-**참조:** PRD v3.4 / HLD v2.4 / LLD v2.5  
-**변경 이력:** v1.0 → v2.0 (3-Track 모델, 청킹 2차원화, 누적 제시 UI 반영) / v2.0 → v2.1 (완료 항목 체크, migration 004 추가, 5구간 연령대) / v2.1 → v2.2 (Phase 5에 행동 관찰하기 5-6 태스크 추가) / v2.2 → v2.3 (행동 관찰하기·협업 그룹 항목 완료 처리 및 마이그레이션 007~013 반영, 브릿지 책장·제목 자동생성/인라인 수정·creator 수정삭제 권한 Phase 5-7 신규 추가) / v2.3 → v2.4 (이미지 생성 파이프라인 Replicate 전환·아바타 캐릭터 일관성, TTS 읽어주기 정상화 3건 버그 수정 완료 처리, 아바타 생성 PhotoMaker→DALL·E 2 실제 구현 정정) / v2.4 → v2.5 (Phase 6-5 배포 항목을 실제 진행 상황(GitHub 연결·Vercel 배포·빌드 오류 수정)에 맞게 갱신)
+**참조:** PRD v3.5 / HLD v2.5 / LLD v2.6  
+**변경 이력:** v1.0 → v2.0 (3-Track 모델, 청킹 2차원화, 누적 제시 UI 반영) / v2.0 → v2.1 (완료 항목 체크, migration 004 추가, 5구간 연령대) / v2.1 → v2.2 (Phase 5에 행동 관찰하기 5-6 태스크 추가) / v2.2 → v2.3 (행동 관찰하기·협업 그룹 항목 완료 처리 및 마이그레이션 007~013 반영, 브릿지 책장·제목 자동생성/인라인 수정·creator 수정삭제 권한 Phase 5-7 신규 추가) / v2.3 → v2.4 (이미지 생성 파이프라인 Replicate 전환·아바타 캐릭터 일관성, TTS 읽어주기 정상화 3건 버그 수정 완료 처리, 아바타 생성 PhotoMaker→DALL·E 2 실제 구현 정정) / v2.4 → v2.5 (Phase 6-5 배포 항목을 실제 진행 상황(GitHub 연결·Vercel 배포·빌드 오류 수정)에 맞게 갱신) / v2.5 → v2.6 (Phase 5-8 아이(child) 역할 신규 추가 — migration 014, 타입 확장, 미들웨어 보호, UI 필터링, BookshelfClient ChildConnectForm 전체 완료 처리)
 
 ---
 
@@ -35,6 +35,7 @@ W1  W2  W3  W4  W5  W6  W7  W8  W9  W10  W11  W12
 #### 1-1. DB v2 마이그레이션
 - [x] `003_v2_schema_update.sql` 작성 및 Supabase 실행 ✅
 - [x] `004_age_group_5segments.sql` 작성 완료 ✅ → **Supabase 실행 필요 ⬜**
+- [x] `014_add_child_role.sql` 작성 및 Supabase 실행 ✅ (2026-06-09) — `user_profiles.role` 및 `group_members.role` CHECK 제약에 'child' 추가
   - children/story_pool age_group CHECK 제약 5구간으로 변경
   - 기존 데이터 마이그레이션 (10-13→10-12, 14-18→16-18)
 
@@ -44,6 +45,8 @@ W1  W2  W3  W4  W5  W6  W7  W8  W9  W10  W11  W12
 - [x] `Story`, `StoryPage`, `GenerateStoryInput` 인터페이스 v2 확장 ✅
 - [x] `TRACK_META` (bgClass 포함), `AGE_GROUP_META`, `CHUNKING_TYPE_META`, `PRESENTATION_MODE_META` 상수 ✅
 - [x] `calcAgeGroup()` 유틸 함수 ✅
+- [x] `UserRole` 타입에 `'child'` 추가 ✅ (2026-06-09) — `'parent' | 'therapist' | 'teacher' | 'child'`
+- [x] `RECORDER_ROLE_META`에 child `{ label: '아이', emoji: '👧' }` 추가 ✅
 
 #### 1-3. 기존 완료 항목
 - [x] 프로젝트 설정 (tsconfig, tailwind, next.config, postcss) ✅
@@ -269,6 +272,27 @@ W1  W2  W3  W4  W5  W6  W7  W8  W9  W10  W11  W12
 - [x] `/observations/[id]` 페이지 (상세 + SeatSelector + StoryLinkButton + AI 제안 박스) ✅
 - [x] Track A 생성 페이지에 "관찰에서 불러오기" 연결 — 자동 입력 채움(silent 404 버그 수정) ✅
 
+#### 5-8. 아이(child) 역할 — NEW v2.6 (2026-06-09, 사용자 요청 기반)
+
+- [x] 회원가입 페이지에 '아이' 역할 옵션 추가 (`🧒 아이 — 소셜 스토리를 읽는 어린이`) ✅
+- [x] `src/components/ui/Badge.tsx` — `roleStyles`/`roleLabels` child 항목 추가 (`bg-yellow-100`) ✅
+- [x] `src/app/(main)/settings/page.tsx` — `ROLE_LABEL` child 항목 추가 (`'아이'`) ✅
+- [x] `src/app/(main)/story/create/page.tsx` — `TRACK_PAGES`를 `Partial<Record<UserRole, string>>`으로 변경해 child가 Track 없는 상태(수동 선택 UI)로 남도록 처리 ✅
+- [x] **미들웨어 아이 역할 보호 (`src/lib/supabase/middleware.ts`)** ✅
+  - child 로그인 시 `/bookshelf`로 리다이렉트 (기존 `/dashboard` 대신)
+  - `CHILD_ALLOWED = ['/bookshelf', '/settings', '/story']`, `CHILD_BLOCKED = ['/story/create']`
+  - child가 허용 외 경로 접근 시 `/bookshelf`로 강제 리다이렉트
+- [x] **SideBar 필터링 (`src/components/layout/SideBar.tsx`)** ✅ — `CHILD_NAV_HREFS = ['/bookshelf', '/settings']`, child는 2개 메뉴만 표시
+- [x] **BottomNavBar 필터링 (`src/components/layout/BottomNavBar.tsx`)** ✅ — `role` prop 추가, child는 2개 메뉴만 표시
+- [x] **MainLayout (`src/app/(main)/layout.tsx`)** ✅ — `<BottomNavBar role={role} />` prop 전달
+- [x] **BookshelfClient 아이 모드 (`src/app/(main)/bookshelf/BookshelfClient.tsx`)** ✅
+  - `ChildConnectForm` 내장 컴포넌트: 초대 코드 입력 → `POST /api/group` → 성공 시 리로드
+  - `isChild` 플래그: 빈 상태 시 "스토리 만들기" 버튼 숨김, 대신 ChildConnectForm 표시
+  - 스토리 목록 상단에도 ChildConnectForm 항상 표시
+- [x] **BookshelfPage (`src/app/(main)/bookshelf/page.tsx`)** ✅ — `user_profiles.role` 함께 조회, `userRole` prop 전달, child 전용 부제목 표시
+- [x] **그룹 참여 API (`src/app/api/group/route.ts`)** ✅ — 보호자만 차단(403), child를 포함한 나머지 역할은 초대 코드 참여 허용
+- [x] DB migration 014 Supabase 실행 완료 ✅ — CHECK 제약 업데이트로 child 역할 회원가입 가능해짐
+
 #### 5-7. 스토리 제목/권한/책장 — NEW v2.3 (2026-06-08, 사용자 요청 기반)
 
 - [x] `raw_input` 섹션 순서를 ABC 순서(관찰된 도전 상황→문제 행동→현재 결과→대체행동 목표)로 정정 ✅
@@ -420,4 +444,15 @@ Phase 1 (기반 + DB v2)
 
 ---
 
-*StoryBridge Plan v2.5 | 2026.06.09*
+## v2.5 → v2.6 변경 요약 (2026.06.09)
+
+| Phase | 추가/변경 내용 |
+|---|---|
+| Phase 1-1 | migration 014 (`014_add_child_role.sql`) 작성 및 Supabase 실행 완료 — `user_profiles.role` / `group_members.role` CHECK 제약에 'child' 추가 |
+| Phase 1-2 | `UserRole` 타입 확장('child' 추가), `RECORDER_ROLE_META` child 항목 추가 |
+| Phase 2-1 | child 로그인 후 `/bookshelf`로 자동 분기 처리(기존 `/dashboard` 대신); 회원가입 역할 선택 UI에 '아이' 4번째 옵션 추가 |
+| Phase 5-8 (신규) | 아이 역할 전체 기능 묶음 완료 처리 — 미들웨어 보호(CHILD_ALLOWED/CHILD_BLOCKED), SideBar/BottomNavBar 필터링, BookshelfClient ChildConnectForm, 그룹 참여 API child 허용, Badge/Settings child 지원 |
+
+---
+
+*StoryBridge Plan v2.6 | 2026.06.09*

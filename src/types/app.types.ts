@@ -143,6 +143,7 @@ export interface Approval {
   status: ApprovalStatus
   diff_before: Partial<StoryPage>
   diff_after: Partial<StoryPage>
+  proposal_reason?: string
   feedback?: string
   created_at: string
   resolved_at?: string
@@ -201,7 +202,8 @@ export interface GenerateAvatarInput {
 
 export interface Notification {
   id: string
-  type: 'approval_request' | 'approval_result' | 'comment' | 'track_notify'
+  user_id: string
+  type: 'approval_request' | 'approval_result' | 'approval_sent' | 'comment' | 'track_notify'
   title: string
   body: string
   story_id?: string

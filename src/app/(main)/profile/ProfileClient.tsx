@@ -161,7 +161,7 @@ export function ProfileClient({ children, userId }: Props) {
         <div className="flex-1 min-w-0 space-y-5 overflow-y-auto pb-24">
           {/* 프로필 정보 카드 */}
           <Card>
-            <div className="flex items-center gap-4 mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
               <div className="w-20 h-20 flex-shrink-0">
                 {profileAvatar ? (
                   <Image src={profileAvatar.image_url} alt={selected.name} width={80} height={80}
@@ -173,7 +173,7 @@ export function ProfileClient({ children, userId }: Props) {
                   </div>
                 )}
               </div>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-xl font-bold text-charcoal">{selected.name}</h2>
                   <span className="text-xs bg-mint-100 text-mint-700 px-2 py-0.5 rounded-lg font-medium">
@@ -183,6 +183,13 @@ export function ProfileClient({ children, userId }: Props) {
                     <span className="text-xs bg-lavender-100 text-lavender-700 px-2 py-0.5 rounded-lg font-medium">
                       🔗 연결된 아이
                     </span>
+                  )}
+                  {isOwner && (
+                    <Link href={`/onboarding/child?edit=${selected.id}`}>
+                      <button className="p-1.5 rounded-xl hover:bg-gray-50 text-soft-gray">
+                        <Pencil size={16} />
+                      </button>
+                    </Link>
                   )}
                 </div>
                 <p className="text-sm text-soft-gray mt-0.5">{age}세</p>
@@ -194,13 +201,6 @@ export function ProfileClient({ children, userId }: Props) {
                   </p>
                 )}
               </div>
-              {isOwner && (
-                <Link href={`/onboarding/child?edit=${selected.id}`}>
-                  <button className="p-2 rounded-xl hover:bg-gray-50 text-soft-gray">
-                    <Pencil size={18} />
-                  </button>
-                </Link>
-              )}
             </div>
 
             {selected.interests.length > 0 && (
