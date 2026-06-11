@@ -38,14 +38,27 @@ export default async function DashboardPage() {
           .eq('creator_id', user.id)
           .order('updated_at', { ascending: false })
           .limit(6),
-    supabase.from('approvals').select('id').eq('status', 'pending'),
+    supabase.from('approvals').select('id, story:stories!inner(child_id)').eq('status', 'pending'),
     supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('is_read', false),
   ])
 
   const profile = profileRes.data as UserProfile | null
   const stories = (storiesRes.data ?? []) as Story[]
-  const pendingCount = pendingRes.data?.length ?? 0
+  const pendingApprovals = (pendingRes.data ?? []) as unknown as { id: string; story: { child_id: string } | null }[]
+  const pendingCount = pendingApprovals.length
   const unreadCount = unreadRes.count ?? 0
+
+  // 승인 대기 건이 속한 그룹이 하나로 특정되면 해당 협업 공간으로 바로 이동
+  let approvalGroupId: string | null = null
+  if (pendingCount > 0) {
+    const pendingChildIds = [...new Set(pendingApprovals.map((a) => a.story?.child_id).filter((id): id is string => !!id))]
+    if (pendingChildIds.length > 0) {
+      const { data: groups } = await supabase.from('groups').select('id, child_id').in('child_id', pendingChildIds)
+      const uniqueGroupIds = [...new Set((groups ?? []).map((g) => g.id))]
+      if (uniqueGroupIds.length === 1) approvalGroupId = uniqueGroupIds[0]
+    }
+  }
+  const approvalLink = approvalGroupId ? `/collab/${approvalGroupId}` : '/collab'
 
   return (
     <div className="px-5 py-6 max-w-2xl mx-auto space-y-6">
@@ -58,7 +71,7 @@ export default async function DashboardPage() {
           <p className="text-sm text-soft-gray">오늘도 함께 이야기를 만들어요</p>
         </div>
         {pendingCount > 0 && (
-          <Link href="/collab" className="relative p-2">
+          <Link href={approvalLink} className="relative p-2">
             <Bell size={24} className="text-charcoal" />
             <Badge variant="count" className="absolute -top-1 -right-1">
               {pendingCount}
@@ -69,7 +82,7 @@ export default async function DashboardPage() {
 
       {/* 승인 대기 배너 (보호자 전용) */}
       {profile?.role === 'parent' && pendingCount > 0 && (
-        <Link href="/collab">
+        <Link href={approvalLink}>
           <Card className="border-coral-300 bg-coral-500/5 hover:bg-coral-500/10 transition-colors">
             <div className="flex items-center gap-3">
               <span className="text-2xl">🔴</span>
