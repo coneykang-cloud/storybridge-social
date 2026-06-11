@@ -39,6 +39,17 @@ export function ApprovalCard({ approval, isParent }: ApprovalCardProps) {
 
   return (
     <Card className="border-warning-amber/40 bg-warning-amber/5">
+      {/* 어느 스토리/페이지에 대한 제안인지 */}
+      {(approval.story?.title || approval.page?.page_number) && (
+        <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-warning-amber/20">
+          <span className="text-sm">📖</span>
+          <span className="text-xs font-medium text-charcoal break-keep">
+            {approval.story?.title}
+            {approval.page?.page_number && ` · ${approval.page.page_number}페이지`}
+          </span>
+        </div>
+      )}
+
       {/* 헤더 */}
       <div className="flex items-start justify-between mb-3">
         <div>

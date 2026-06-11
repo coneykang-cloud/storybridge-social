@@ -36,13 +36,13 @@ export default async function CollabPage({ params }: Props) {
       .eq('group_id', groupId),
     supabase
       .from('approvals')
-      .select('*, requester:user_profiles(id, full_name, role), story:stories!inner(child_id)')
+      .select('*, requester:user_profiles(id, full_name, role), story:stories!inner(child_id, title), page:story_pages(page_number)')
       .eq('status', 'pending')
       .eq('story.child_id', group.child_id)
       .order('created_at', { ascending: false }),
     supabase
       .from('approvals')
-      .select('*, requester:user_profiles(id, full_name, role), story:stories!inner(child_id)')
+      .select('*, requester:user_profiles(id, full_name, role), story:stories!inner(child_id, title), page:story_pages(page_number)')
       .neq('status', 'pending')
       .eq('story.child_id', group.child_id)
       .order('resolved_at', { ascending: false }),

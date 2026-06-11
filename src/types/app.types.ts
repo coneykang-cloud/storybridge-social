@@ -148,6 +148,8 @@ export interface Approval {
   created_at: string
   resolved_at?: string
   requester?: UserProfile
+  story?: { title: string }
+  page?: { page_number: number } | null
 }
 
 export interface Comment {
