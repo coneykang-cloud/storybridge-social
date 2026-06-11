@@ -100,6 +100,7 @@
 | '승인 내역' 탭 신규 (`ApprovalHistoryCard`, `collab.store.ts`의 `approvalHistory` 상태) | ✅ |
 | **버그 수정:** 대시보드 "승인 대기 N건" 배너가 항상 `/collab`(그룹 목록)로 연결되던 문제 — 대기 승인이 속한 그룹이 하나면 `/collab/{groupId}`로 다이렉트 이동 | ✅ |
 | 대시보드 "안 읽은 알림 N건" 배너 신규 (`/notifications` 연결) | ✅ |
+| `public/logo.png` 배경을 크림색(`#F9F8F3`)에서 투명으로 처리(color-to-alpha) — 사이드바(흰 배경)에서 로고 주변 박스 표시되던 문제 수정 (`Logo`/`LogoHorizontal` 컴포넌트 변경 없음, 이미지 자산만 교체) | ✅ |
 
 ### 타입 시스템 (app.types.ts)
 | 타입 / 상수 | 내용 |
