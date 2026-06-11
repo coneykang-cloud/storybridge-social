@@ -1,10 +1,10 @@
 # StoryBridge 구현 계획 (Implementation Plan) v2.0
 
-**버전:** v2.6  
-**작성일:** 2026.06.05 / 최종 업데이트: 2026.06.09  
+**버전:** v2.7  
+**작성일:** 2026.06.05 / 최종 업데이트: 2026.06.11  
 **작성자:** 강현정  
-**참조:** PRD v3.5 / HLD v2.5 / LLD v2.6  
-**변경 이력:** v1.0 → v2.0 (3-Track 모델, 청킹 2차원화, 누적 제시 UI 반영) / v2.0 → v2.1 (완료 항목 체크, migration 004 추가, 5구간 연령대) / v2.1 → v2.2 (Phase 5에 행동 관찰하기 5-6 태스크 추가) / v2.2 → v2.3 (행동 관찰하기·협업 그룹 항목 완료 처리 및 마이그레이션 007~013 반영, 브릿지 책장·제목 자동생성/인라인 수정·creator 수정삭제 권한 Phase 5-7 신규 추가) / v2.3 → v2.4 (이미지 생성 파이프라인 Replicate 전환·아바타 캐릭터 일관성, TTS 읽어주기 정상화 3건 버그 수정 완료 처리, 아바타 생성 PhotoMaker→DALL·E 2 실제 구현 정정) / v2.4 → v2.5 (Phase 6-5 배포 항목을 실제 진행 상황(GitHub 연결·Vercel 배포·빌드 오류 수정)에 맞게 갱신) / v2.5 → v2.6 (Phase 5-8 아이(child) 역할 신규 추가 — migration 014, 타입 확장, 미들웨어 보호, UI 필터링, BookshelfClient ChildConnectForm 전체 완료 처리)
+**참조:** PRD v3.6 / HLD v2.6 / LLD v2.7  
+**변경 이력:** v1.0 → v2.0 (3-Track 모델, 청킹 2차원화, 누적 제시 UI 반영) / v2.0 → v2.1 (완료 항목 체크, migration 004 추가, 5구간 연령대) / v2.1 → v2.2 (Phase 5에 행동 관찰하기 5-6 태스크 추가) / v2.2 → v2.3 (행동 관찰하기·협업 그룹 항목 완료 처리 및 마이그레이션 007~013 반영, 브릿지 책장·제목 자동생성/인라인 수정·creator 수정삭제 권한 Phase 5-7 신규 추가) / v2.3 → v2.4 (이미지 생성 파이프라인 Replicate 전환·아바타 캐릭터 일관성, TTS 읽어주기 정상화 3건 버그 수정 완료 처리, 아바타 생성 PhotoMaker→DALL·E 2 실제 구현 정정) / v2.4 → v2.5 (Phase 6-5 배포 항목을 실제 진행 상황(GitHub 연결·Vercel 배포·빌드 오류 수정)에 맞게 갱신) / v2.5 → v2.6 (Phase 5-8 아이(child) 역할 신규 추가 — migration 014, 타입 확장, 미들웨어 보호, UI 필터링, BookshelfClient ChildConnectForm 전체 완료 처리) / v2.6 → v2.7 (Phase 5-9 알림 시스템 + 수정 제안 승인 플로우 고도화 신규 추가 — migration 015~019, notifications 테이블·notification.store.ts·`/notifications`, StoryPageEditor, proposal_reason, DiffViewer LCS 하이라이트, 승인 내역 탭, 대시보드 승인 배너 다이렉트 이동 버그 수정 전체 완료 처리; Phase 5-3 체크 상태 정정)
 
 ---
 
@@ -231,18 +231,19 @@ W1  W2  W3  W4  W5  W6  W7  W8  W9  W10  W11  W12
 - [x] 초대 코드 입력 → 그룹 참여 (`/api/group`, 치료사·교사가 협업 공간에서 입력) ✅
 - [x] groups/group_members RLS 정책 정상화 (마이그레이션 009→010→011→012, deny-all + cross-table 무한 재귀 2종 해결, 최종 `is_group_member()`/`is_child_parent()` `plpgsql SECURITY DEFINER` 헬퍼) ✅
 - [x] 협업 그룹 연결된 아이 전역 표시 (`/profile`에서 `parent_id` 필터 제거 → RLS만으로 "내 아이 + 연결된 아이" 모두 조회, "🔗 연결된 아이" 배지) ✅
-- [ ] **신규:** Track별 알림 Realtime 이벤트 분기
+- [ ] **신규:** Track별 알림 Realtime 이벤트 분기 (HLD §6.2 설계안, 미구현)
   - `story:created:trackA` → 보호자 알림
   - `story:created:trackB` → 치료사 알림 (선택적)
   - `story:created:trackC` → 그룹 전체 알림
+  - → v2.7에서 구현된 것은 **승인 제안/처리 알림**(`notifications` 테이블, §5-9)이며, "스토리 생성" 자체에 대한 Track별 알림 분기는 여전히 미구현
 - [ ] collab.store.ts Track별 알림 처리
 
 #### 5-3. Track별 승인 플로우
-- [ ] 치료사/교사 수정 제안 UI ✅
-- [ ] ApprovalCard에 `track` 정보 표시
-- [ ] 승인 요청 시 `track` 필드 저장
-- [ ] 보호자 승인/거절 + 피드백 댓글 ✅
-- [ ] 승인 히스토리 Track 구분 표시
+- [x] 치료사/교사 수정 제안 UI (`StoryPageEditor`, v2.7 — §5-9) ✅
+- [ ] ApprovalCard에 `track` 정보 표시 → v2.7에서 "스토리 제목 + 페이지 번호" 배지로 대체 구현 (§5-9), track 배지 자체는 미구현
+- [x] 승인 요청 시 `track` 필드 저장 (`POST /api/approval`에서 `story.track`을 그대로 insert) ✅
+- [x] 보호자 승인/거절 + 피드백 댓글 (`PATCH /api/approval`, `proposal_reason` 포함 — v2.7 §5-9) ✅
+- [ ] 승인 히스토리 Track 구분 표시 → v2.7에서 '승인 내역' 탭(`ApprovalHistoryCard`)으로 구현되었으나 Track 구분 없이 시간순 표시 (§5-9)
 
 #### 5-4. 자문 댓글
 - [ ] 스토리/페이지 레벨 댓글 ✅
@@ -292,6 +293,27 @@ W1  W2  W3  W4  W5  W6  W7  W8  W9  W10  W11  W12
 - [x] **BookshelfPage (`src/app/(main)/bookshelf/page.tsx`)** ✅ — `user_profiles.role` 함께 조회, `userRole` prop 전달, child 전용 부제목 표시
 - [x] **그룹 참여 API (`src/app/api/group/route.ts`)** ✅ — 보호자만 차단(403), child를 포함한 나머지 역할은 초대 코드 참여 허용
 - [x] DB migration 014 Supabase 실행 완료 ✅ — CHECK 제약 업데이트로 child 역할 회원가입 가능해짐
+
+#### 5-9. 알림 시스템 + 수정 제안 승인 플로우 고도화 — NEW v2.7 (2026-06-11, 사용자 요청 기반)
+
+- [x] DB migration 015 (`notifications` 테이블 + RLS — `type`/`title`/`body`/`story_id`/`is_read`) ✅ 실행 완료
+- [x] DB migration 017 (`approvals.proposal_reason TEXT` 추가 — 전문가가 수정 제안 시 사유 입력) ✅ 실행 완료
+- [x] DB migration 018 (`approvals`/`comments`/`notifications`를 `supabase_realtime` publication에 추가 — 누락 시 `SUBSCRIBED`여도 INSERT 이벤트 미수신되는 버그 해결) ✅ 실행 완료
+- [x] DB migration 019 (`notifications.type` CHECK에 `'approval_sent'` 추가) ✅ 실행 완료
+- [x] `notification.store.ts` 신규 — `notifications:{userId}` 채널 구독, `fetchNotifications`/`markAsRead`/`markAllAsRead` ✅
+- [x] `/notifications` 페이지 + `NotificationsClient` — 알림 목록, 안 읽음 표시, 클릭 시 스토리/협업 공간으로 이동 ✅
+- [x] SideBar/BottomNavBar에 '알림' 메뉴 + `unreadCount` 배지 추가 (`MainLayout`에서 unread count 계산) ✅
+- [x] `StoryPageEditor` 신규 — 페이지별 인라인 수정/제안 UI (`canEditDirectly`/`canPropose` 분기, 제안 사유 입력란) ✅
+- [x] `POST /api/approval`에 `proposal_reason` 저장 + `notifyUser()` 알림 발송 (보호자에게 `approval_request`, 제안자 본인에게 `approval_sent`) ✅
+- [x] `PATCH /api/approval`에 `notifyUser()` 알림 발송 (`approval_result`, diff 요약 포함) ✅
+- [x] `summarizeDiff()`/`FIELD_LABELS`/`truncate()` — 변경 필드를 "[설명문] ..." 형태 한 줄 요약으로 변환해 알림 본문에 사용 ✅
+- [x] `ApprovalCard`/`ApprovalHistoryCard`에 스토리 제목 + 페이지 번호 배지(`📖 {제목} · {N}페이지`) 추가 — 어느 스토리/페이지의 제안인지 식별 가능 ✅
+- [x] `DiffViewer` — LCS(최장 공통 부분열) 기반 토큰(단어) 단위 diff로 변경된 단어/구절만 하이라이트 (이전엔 문단 전체만 비교) ✅
+- [x] '승인 내역' 탭 신규 (`ApprovalHistoryCard`, `collab.store.ts`의 `approvalHistory` 상태) — 처리 완료된 제안을 시간순으로 표시 ✅
+- [x] **버그 수정:** 대시보드 "승인 대기 N건" 배너가 항상 `/collab`(그룹 목록, 승인 정보 없음)로 연결되던 문제 — 대기 승인이 속한 그룹이 하나로 특정되면 `/collab/{groupId}`로 다이렉트 이동하도록 수정 ✅
+- [x] 대시보드에 "안 읽은 알림 N건" 배너 신규 추가 (`/notifications`로 연결) ✅
+- [ ] (참고) `SideBar`의 `pendingCount` prop·"승인 대기 N건" 박스는 `MainLayout`이 값을 전달하지 않아 항상 0으로 죽은 코드 — 후속 정리 필요 (LLD §3.22) ⬜
+- [ ] (참고) `016_user_profiles_group_visibility.sql`은 1바이트 손상 파일("4")인데도 cross-user RLS는 정상 동작 중 — 원인 불명, 후속 조사 필요 (LLD §1.6) ⬜
 
 #### 5-7. 스토리 제목/권한/책장 — NEW v2.3 (2026-06-08, 사용자 요청 기반)
 
@@ -455,4 +477,14 @@ Phase 1 (기반 + DB v2)
 
 ---
 
-*StoryBridge Plan v2.6 | 2026.06.09*
+## v2.6 → v2.7 변경 요약 (2026.06.11)
+
+| Phase | 추가/변경 내용 |
+|---|---|
+| Phase 5-2 | "Track별 알림 Realtime 이벤트 분기" 항목에 v2.7에서 구현된 승인 알림(`notifications` 테이블)과의 차이를 명시 — 스토리 생성 자체에 대한 Track별 알림 분기는 여전히 미구현 |
+| Phase 5-3 | "치료사/교사 수정 제안 UI"·"승인 요청 시 `track` 필드 저장"·"보호자 승인/거절 + 피드백 댓글" 완료 처리(`[x]`)로 정정; "ApprovalCard에 track 정보 표시"·"승인 히스토리 Track 구분 표시"는 v2.7에서 스토리/페이지 배지·승인 내역 탭으로 대체 구현되었음을 명시(track 자체 배지는 미구현) |
+| Phase 5-9 (신규) | 알림 시스템 + 수정 제안 승인 플로우 고도화 전체 완료 처리 — migration 015/017/018/019, `notification.store.ts`, `/notifications` 페이지, SideBar/BottomNavBar 알림 배지, `StoryPageEditor`, `proposal_reason`, `notifyUser`/`summarizeDiff`, ApprovalCard/ApprovalHistoryCard 스토리·페이지 배지, `DiffViewer` LCS 단어 단위 하이라이트, 승인 내역 탭, 대시보드 승인 배너 다이렉트 이동 버그 수정 + 안 읽은 알림 배너 |
+
+---
+
+*StoryBridge Plan v2.7 | 2026.06.11*

@@ -1,10 +1,10 @@
 # StoryBridge HLD (High-Level Design) v2.0
 
-**버전:** v2.5  
-**작성일:** 2026.06.05 / 최종 업데이트: 2026.06.09  
+**버전:** v2.6  
+**작성일:** 2026.06.05 / 최종 업데이트: 2026.06.11  
 **작성자:** 강현정  
-**참조:** StoryBridge_PRD_v3_5.md  
-**변경 이력:** v1.0 → v2.0 (3-Track 모델, 청킹 2차원화, 누적 제시 UI 반영) / v2.0 → v2.1 (사이드바 역할 배지 구현, ChildSelectorPanel 추가, /profile 라우트, 연령대 5구간) / v2.1 → v2.2 (행동 관찰하기 Observation 모듈 추가, ABC→Track A 데이터 플로우, SEAT AI 파이프라인 추가) / v2.2 → v2.3 (브릿지 책장 라우트, AI 제목 자동 생성·인라인 수정, creator 기반 수정·삭제 권한 + RLS 정책 동기화, ABC→Track A 매핑을 raw_input 실제 순서로 수정) / v2.3 → v2.4 (이미지 생성 Pollinations/DALL·E 3 → Replicate FLUX 전환 및 아바타 기반 캐릭터 일관성 도입, Google TTS 버그 수정 — enableTimePointing 필드 제거 및 service-role 캐싱) / v2.4 → v2.5 (아이(child) 역할 추가 — 역할 구조 RBAC 확장, 미들웨어 child 전용 리다이렉트 로직, SideBar/BottomNavBar nav 필터링, BookshelfClient ChildConnectForm, 그룹 참여 API child 허용)
+**참조:** StoryBridge_PRD_v3_6.md  
+**변경 이력:** v1.0 → v2.0 (3-Track 모델, 청킹 2차원화, 누적 제시 UI 반영) / v2.0 → v2.1 (사이드바 역할 배지 구현, ChildSelectorPanel 추가, /profile 라우트, 연령대 5구간) / v2.1 → v2.2 (행동 관찰하기 Observation 모듈 추가, ABC→Track A 데이터 플로우, SEAT AI 파이프라인 추가) / v2.2 → v2.3 (브릿지 책장 라우트, AI 제목 자동 생성·인라인 수정, creator 기반 수정·삭제 권한 + RLS 정책 동기화, ABC→Track A 매핑을 raw_input 실제 순서로 수정) / v2.3 → v2.4 (이미지 생성 Pollinations/DALL·E 3 → Replicate FLUX 전환 및 아바타 기반 캐릭터 일관성 도입, Google TTS 버그 수정 — enableTimePointing 필드 제거 및 service-role 캐싱) / v2.4 → v2.5 (아이(child) 역할 추가 — 역할 구조 RBAC 확장, 미들웨어 child 전용 리다이렉트 로직, SideBar/BottomNavBar nav 필터링, BookshelfClient ChildConnectForm, 그룹 참여 API child 허용) / v2.5 → v2.6 (알림 시스템 아키텍처 신규 — notifications 테이블 + 사용자별 Realtime 채널 + notification.store.ts, 승인 플로우를 실제 구현(notify 함수·diff 요약)에 맞게 §6 갱신, supabase_realtime publication 등록 필요성 명시)
 
 ---
 
@@ -396,22 +396,24 @@ Track 접근 권한:
 
 ## 6. 실시간 통신 설계
 
-### 6.1 Supabase Realtime 채널 — Track별 알림 분기 (v2 변경)
+### 6.1 Supabase Realtime 채널 — Track별 알림 분기 (v2 설계, 일부 미구현)
 
 ```
 채널: group:{group_id}
   이벤트:
-  - story:created:trackA    → 보호자에게 "가정 활용 요청" 알림
-  - story:created:trackB    → 치료사에게 "검토 요청" 알림 (선택적)
-  - story:created:trackC    → 보호자 + 치료사 전체에 "새 스토리" 알림
-  - approval:created        → 보호자에게 승인 요청 알림
-  - approval:updated        → 요청자에게 결과 알림
-  - comment:created         → 그룹 멤버 전체 알림
+  - story:created:trackA    → 보호자에게 "가정 활용 요청" 알림   ⬜ 미구현 (v4 이후)
+  - story:created:trackB    → 치료사에게 "검토 요청" 알림 (선택적) ⬜ 미구현 (v4 이후)
+  - story:created:trackC    → 보호자 + 치료사 전체에 "새 스토리" 알림 ⬜ 미구현 (v4 이후)
+  - approval:created (INSERT on approvals) → 협업 공간 "승인 요청" 탭 실시간 갱신 ✅ 구현
+  - comment:created  (INSERT on comments)  → 자문 댓글 탭 실시간 갱신 ✅ 구현
 ```
 
-### 6.2 알림 매트릭스 구현
+> `group:{group_id}` 채널은 `collab.store.ts`가 구독하며, `approvals`/`comments` 테이블 INSERT만 처리한다(승인 처리 후 UPDATE는 페이지 새로고침으로 반영). Track 생성 시점 알림(`story:created:*`)은 §10(PRD) 알림 매트릭스에 설계만 남아 있고 아직 `notifications` row를 만들지 않는다.
+
+### 6.2 알림 매트릭스 구현 (설계 — Track 생성 알림, 미구현)
 
 ```typescript
+// 설계안: 아직 호출되지 않음 (v4 이후 과제)
 function notifyByTrack(track: 'A' | 'B' | 'C', groupId: string, storyId: string) {
   switch(track) {
     case 'A': notifyParent(groupId, '치료사가 스토리를 만들었어요', storyId)
@@ -420,6 +422,38 @@ function notifyByTrack(track: 'A' | 'B' | 'C', groupId: string, storyId: string)
   }
 }
 ```
+
+### 6.3 알림 시스템 아키텍처 — NEW v2.6 (수정 제안 승인 플로우, 구현 완료)
+
+`group:{group_id}` 채널과 별도로, **사용자별 알림 채널**을 통해 본인에게 온 알림을 실시간 수신한다.
+
+```
+채널: notifications:{user_id}
+  구독: notification.store.ts (connect(userId))
+  이벤트:
+  - INSERT on notifications WHERE user_id = {user_id}
+      → 알림 목록 prepend + unreadCount += 1
+      → SideBar/BottomNavBar 배지, 대시보드 "안 읽은 알림 N건" 배너 갱신
+```
+
+**알림 생성 경로 (`/api/approval` route, service-role로 RLS 우회 INSERT)**
+
+```
+POST /api/approval (수정 제안 전송)
+  ├─ canEditDirectly(보호자/creator) → 즉시 반영, 알림 없음
+  └─ 그 외 역할 → approvals.status='pending'
+       ├─ notifyUser(보호자, type='approval_request', "{이름}님이 수정을 제안했어요: {사유}")
+       └─ notifyUser(제안자 본인, type='approval_sent', "{변경 요약} (보호자 승인 대기중)")
+
+PATCH /api/approval (보호자 승인/거절)
+  ├─ status='approved' → story_pages에 diff_after 반영
+  └─ notifyUser(제안자, type='approval_result',
+       승인: "{변경 요약} → 반영됐어요" / 거절: 피드백 또는 "{변경 요약} 제안이 거절됐어요")
+```
+
+`{변경 요약}`은 `summarizeDiff()`가 `diff_after`의 `descriptive`/`perspective`/`coaching` 필드를 "[설명문] ...(40자 truncate)" 형태로 합쳐 생성한다.
+
+> **전제 조건 (migration 018)** — `approvals`/`comments`/`notifications` 테이블이 `supabase_realtime` publication에 등록되어 있어야 `postgres_changes` 구독이 실제로 이벤트를 수신한다. 이 등록이 누락되면 채널 상태는 `SUBSCRIBED`로 정상 표시되지만 이벤트가 전혀 도착하지 않는 silent failure가 발생한다.
 
 ---
 
@@ -592,4 +626,20 @@ Vercel CI/CD Pipeline
 
 ---
 
-*StoryBridge HLD v2.4 | 2026.06.08*
+## v2.4 → v2.5 변경 요약 (2026.06.09)
+
+| 섹션 | 변경 내용 |
+|---|---|
+| §5.1/§5.5 역할 구조 | 아이(child) 역할 추가 — RBAC 4번째 역할, 미들웨어 child 전용 리다이렉트(`/bookshelf`), SideBar/BottomNavBar nav 필터링, BookshelfClient ChildConnectForm, 그룹 참여 API child 허용 |
+
+## v2.5 → v2.6 변경 요약 (2026.06.11)
+
+| 섹션 | 변경 내용 |
+|---|---|
+| §6.1 | Track 생성 시점 알림(`story:created:trackA/B/C`)을 "설계만 존재, 미구현"으로 명시; `approval:created`/`comment:created`(INSERT 기반)는 구현 완료로 정정 |
+| §6.2 | `notifyByTrack()`을 미구현 설계안으로 명시 |
+| §6.3 (신규) | 알림 시스템 아키텍처 — `notifications` 테이블, `notifications:{user_id}` Realtime 채널, `notification.store.ts`, `/api/approval`의 `notifyUser`/`summarizeDiff` 흐름, migration 018 publication 등록 전제조건 |
+
+---
+
+*StoryBridge HLD v2.6 | 2026.06.11*

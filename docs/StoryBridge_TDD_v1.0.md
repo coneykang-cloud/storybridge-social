@@ -1,9 +1,9 @@
 # StoryBridge Technical Design Document (TDD)
 
-**버전:** v1.5  
-**작성일:** 2026.06.05 / 최종 업데이트: 2026.06.09  
+**버전:** v1.6  
+**작성일:** 2026.06.05 / 최종 업데이트: 2026.06.11  
 **작성자:** 강현정  
-**참조:** PRD v3.5 / HLD v2.5 / LLD v2.6 / Plan v2.6
+**참조:** PRD v3.6 / HLD v2.6 / LLD v2.7 / Plan v2.7
 
 ---
 
@@ -188,11 +188,12 @@ IDE: VSCode / Claude Code
 
 ```typescript
 // 스토어 분리 원칙
-auth.store.ts    — 인증 사용자 정보
-child.store.ts   — 선택된 아동 프로필
-story.store.ts   — 스토리 생성 상태, 스트리밍 진행
-collab.store.ts  — Realtime 채널, 알림, 승인 목록
-ui.store.ts      — 고대비 모드, 뷰어 설정 (localStorage 영속)
+auth.store.ts         — 인증 사용자 정보
+child.store.ts        — 선택된 아동 프로필
+story.store.ts        — 스토리 생성 상태, 스트리밍 진행
+collab.store.ts       — group:{groupId} Realtime 채널, 승인 목록(approvals) + 승인 내역(approvalHistory), 댓글
+notification.store.ts — notifications:{userId} Realtime 채널, 알림 목록·unreadCount, markAsRead/markAllAsRead — NEW v1.6
+ui.store.ts           — 고대비 모드, 뷰어 설정 (localStorage 영속)
 ```
 
 ### 4.4 컴포넌트 설계 원칙
@@ -201,6 +202,26 @@ ui.store.ts      — 고대비 모드, 뷰어 설정 (localStorage 영속)
 - **`'use client'` 최소화:** 상호작용이 필요한 리프 노드에만 적용
 - **Props Drilling 방지:** 깊은 트리는 Zustand 스토어 활용
 - **접근성:** 모든 버튼 최소 48px, 고대비 모드 지원
+
+### 4.5 DiffViewer — LCS 기반 단어 단위 diff (NEW v1.6)
+
+```typescript
+// 1. 공백을 보존하며 단어 단위로 토큰화
+function tokenize(text: string): string[] {
+  return text.split(/(\s+)/)
+}
+
+// 2. LCS(최장 공통 부분열) DP 테이블로 토큰을 equal/remove/add로 분류
+function diffTokens(before: string[], after: string[]): DiffToken[] {
+  // dp[i][j] = before[i:]와 after[j:]의 LCS 길이
+  // 역추적하며 일치 토큰은 'equal', before에만 있으면 'remove',
+  // after에만 있으면 'add'로 태깅
+}
+```
+
+- 변경 전(`diff_before`)과 변경 후(`diff_after`)의 각 필드(`descriptive`/`perspective`/`coaching`)를 토큰화 후 LCS로 비교
+- 좌측 컬럼: `equal` + `remove` 토큰 (삭제된 단어는 취소선 강조), 우측 컬럼: `equal` + `add` 토큰 (추가된 단어는 하이라이트)
+- 문단 전체를 단순 비교하던 기존 방식과 달리, **달라진 단어/구절만** 시각적으로 구분되어 ApprovalCard/ApprovalHistoryCard에서 변경 범위를 빠르게 파악 가능
 
 ---
 
@@ -282,6 +303,54 @@ generateAvatarImage(style, age, name)
 
 > **정정 (2026-06-08, v1.4):** 기존엔 "1순위 Replicate PhotoMaker(사진 기반 개인화) → 2순위 DALL-E 2 → 3순위 Dicebear" 3단계로 기술돼 있었으나, 실제 `generateAvatarImage()`(`lib/openai/avatar.ts`) 코드에는 PhotoMaker 연동이 없다 — DALL·E 2 생성 실패 시 바로 Dicebear로 폴백하는 2단계 구조다. §7.4의 PhotoMaker 연동 상세 역시 같은 사유로 "미구현/계획 단계" 주석을 추가했다(아래 §7.4 참고). 페이지 일러스트(스토리 본문 이미지) 생성은 §5.4의 별도 파이프라인(Replicate FLUX)을 사용하며 이 아바타 생성 경로와는 무관하다.
 
+### 5.6 수정 제안 승인 플로우 — proposal_reason + 알림 발송 (NEW v1.6)
+
+```typescript
+// POST /api/approval — 수정 제안 생성
+canEditDirectly = (user.id === story.creator_id || user.id === parentId)
+
+insert approvals {
+  story_id, page_id, requester_id, track,
+  status: canEditDirectly ? 'approved' : 'pending',
+  diff_before, diff_after,
+  proposal_reason: reason ?? null,   // ← NEW v1.6
+  ...(canEditDirectly && { resolved_at: now })
+}
+
+if (canEditDirectly) {
+  applyDiffToPage(page_id, diff_after)  // 즉시 반영
+} else {
+  notifyUser({ user_id: parentId, type: 'approval_request', ... })   // 보호자에게
+  notifyUser({ user_id: requester.id, type: 'approval_sent', ... })  // 제안자 본인에게
+}
+
+// PATCH /api/approval — 보호자 승인/거절 (parent role만)
+update approvals { status, resolved_at, feedback? }
+if (status === 'approved' && page_id) applyDiffToPage(page_id, diff_after)
+notifyUser({ user_id: requester_id, type: 'approval_result', ... })
+```
+
+```typescript
+// 알림 본문 생성 — 변경된 필드를 사람이 읽을 수 있는 한 줄 요약으로 변환
+const FIELD_LABELS = { descriptive: '설명문', perspective: '조망문', coaching: '지시문' }
+function truncate(text, max = 40) { return text.length > max ? text.slice(0, max) + '...' : text }
+function summarizeDiff(diff) {
+  return Object.entries(diff)
+    .filter(([key]) => key in FIELD_LABELS)
+    .map(([key, value]) => `[${FIELD_LABELS[key]}] ${truncate(String(value))}`)
+    .join(' / ')
+}
+// 예: "[설명문] 줄 맨 뒤에 서서 내 차례를 조용히 기다려요."
+
+// notifyUser — RLS 우회 (수신자가 호출자 본인이 아닐 수 있으므로 service role 사용)
+async function notifyUser(payload: { user_id, type, title, body, story_id? }) {
+  const serviceClient = await createServiceClient()
+  await serviceClient.from('notifications').insert(payload)
+}
+```
+
+> **주의:** `notifyUser()` 호출은 try/catch로 감싸여 있지 않다. `notifications` insert가 실패하면 승인/제안 처리(`approvals` insert/update와 `applyDiffToPage`)가 이미 성공했더라도 API 응답이 500으로 끝난다 — §15.3 기술 부채 참고.
+
 ---
 
 ## 6. 데이터베이스 설계
@@ -309,6 +378,10 @@ behavior_observations  ← NEW v1.3
     │ N:1 → children
     │ N:1 → user_profiles (therapist)
     └─── N:1 → stories (nullable, observation_id FK)
+
+notifications  ← NEW v1.6
+    │ N:1 → user_profiles (user_id, 수신자)
+    └─── N:1 → stories (nullable, story_id FK)
 ```
 
 ### 6.2 핵심 테이블 설계 결정
@@ -322,6 +395,8 @@ behavior_observations  ← NEW v1.3
 | `avatars` 최대 5개 트리거 | Storage 용량 관리, 인지 과부하 방지 |
 | `groups` 아동 1명당 1개 | 협업 단위 명확화 |
 | `behavior_observations.seat_function TEXT[]` | SEAT 복수 선택 허용, 순서 무관 |
+| `approvals.proposal_reason TEXT` (nullable) — NEW v1.6 | 전문가가 수정 제안 시 사유를 함께 기록, 보호자 검토에 참고 |
+| `notifications` 별도 테이블 (NEW v1.6) | `type`/`title`/`body`/`story_id`/`is_read` — 승인 요청·발신 확인·승인 결과·댓글 알림을 역할 구분 없이 단일 테이블로 관리, 수신자(`user_id`)별 RLS로 격리 |
 
 ### 6.3 마이그레이션 이력
 
@@ -332,7 +407,13 @@ behavior_observations  ← NEW v1.3
 | `003_v2_schema_update.sql` | Track·청킹·누적제시 컬럼 추가 | ✅ 실행 완료 |
 | `004_age_group_5segments.sql` | children/story_pool 연령대 5구간 변경 | ✅ 실행 완료 |
 | `005_stories_delete_policy.sql` | stories DELETE RLS 정책 추가 (보호자 삭제 권한) | ✅ 실행 완료 (2026-06-07) |
-| `006_behavior_observations.sql` | behavior_observations 테이블 + RLS; stories.observation_id FK | ⏳ 개발 예정 |
+| `006_behavior_observations.sql` | behavior_observations 테이블 + RLS; stories.observation_id FK | ✅ 실행 완료 (2026-06-08) |
+| `007~014` | 그룹/RLS 무한 재귀 해결, creator 삭제 권한, child 역할 추가 등 — 상세는 LLD §1.6 참고 | ✅ 실행 완료 |
+| `015_notifications.sql` — NEW v1.6 | notifications 테이블 + RLS (`type`/`title`/`body`/`story_id`/`is_read`) | ✅ 실행 완료 (2026-06-11) |
+| `016_user_profiles_group_visibility.sql` | ⚠️ 1바이트 손상 파일("4") — 실행에는 영향 없으나 원인 불명, 후속 조사 필요 (LLD §1.6) | ⚠️ |
+| `017_approval_proposal_reason.sql` — NEW v1.6 | `approvals.proposal_reason TEXT` 추가 | ✅ 실행 완료 (2026-06-11) |
+| `018_realtime_publication.sql` — NEW v1.6 | `approvals`/`comments`/`notifications`를 `supabase_realtime` publication에 추가 | ✅ 실행 완료 (2026-06-11) |
+| `019_notification_approval_sent.sql` — NEW v1.6 | `notifications.type` CHECK에 `'approval_sent'` 추가 | ✅ 실행 완료 (2026-06-11) |
 
 ### 6.4 인덱스 전략
 
@@ -518,31 +599,59 @@ RLS 레이어 검증 (DB 레벨):
 
 ## 9. 실시간 통신 설계
 
-### 9.1 Supabase Realtime 채널
+### 9.1 group:{group_id} 채널 (collab.store.ts)
 
 ```typescript
 // 채널명: group:{group_id}
-// 구독 이벤트:
+// 구독 이벤트 (모두 INSERT만 — UPDATE/DELETE는 미구독):
 
 'postgres_changes' → approvals INSERT
-  filter: story_id = {child 소유 스토리}
-  → 보호자에게 승인 요청 알림
+  → collab.store.ts의 approvals(승인 대기) 배열 앞에 추가
 
 'postgres_changes' → comments INSERT
-  → 그룹 멤버 전체에 댓글 알림
-
-// Track별 알림 분기 (서버 → DB 삽입 → Realtime)
-Track A 생성 → approvals 또는 notifications 테이블 → 보호자
-Track B 검토 요청 → 치료사
-Track C 공유 → 그룹 전체
+  → 그룹 멤버 전체에 댓글 실시간 추가
 ```
 
-### 9.2 연결 관리
+> **주의:** `approvals`/`comments`는 INSERT만 구독한다. `PATCH /api/approval`로 `status`가 변경(승인/거절)되어도 Realtime UPDATE 이벤트는 오지 않으므로, `collab.store.ts`의 `resolveApproval()`은 PATCH 응답을 받은 클라이언트 본인이 로컬 상태에서 `approvals` → `approvalHistory`로 직접 옮기는 방식으로 '승인 내역' 탭을 갱신한다 — 같은 그룹의 다른 사용자 화면은 새로고침 전까지 갱신되지 않는다.
+
+### 9.2 notifications:{user_id} 채널 (notification.store.ts) — NEW v1.6
+
+```typescript
+// 채널명: notifications:{user_id}
+supabase.channel(`notifications:${userId}`)
+  .on('postgres_changes',
+    { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+    (payload) => { /* notifications 배열 맨 앞에 추가, unreadCount += 1 */ }
+  )
+  .subscribe()
+```
+
+- `connect(userId)`/`disconnect()` — `MainLayout`에서 로그인 사용자 기준으로 1회 연결
+- `notifyUser()`(§5.6)가 service role로 `notifications`에 INSERT하면, 수신자 브라우저의 이 채널이 즉시 이벤트를 받아 알림 배지(`unreadCount`)와 `/notifications` 목록을 실시간 갱신
+- HLD §6.2에서 설계됐던 "스토리 생성 시 Track별(`story:created:trackA/B/C`) Realtime 알림 분기"는 여전히 미구현이며, 실제 구현된 것은 **승인 제안/처리에 대한 알림**(이 절)뿐이다 (Plan §5-9 참고)
+
+### 9.3 supabase_realtime publication 등록 — 필수 전제조건 (migration 018, NEW v1.6)
+
+> **버그 이력 (2026-06-11):** Supabase Realtime의 `postgres_changes`는 채널이 `SUBSCRIBED` 상태가 되어도, 대상 테이블이 `supabase_realtime` publication에 등록되어 있지 않으면 이벤트를 전혀 받지 못한다 — 에러 없이 조용히 무시된다. `approvals`/`comments`/`notifications` 3개 테이블이 모두 누락되어 있었고, `018_realtime_publication.sql`로 등록한 뒤 정상 동작이 확인되었다.
+
+```sql
+ALTER PUBLICATION supabase_realtime ADD TABLE public.approvals;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.comments;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+```
+
+> 새 테이블에 Realtime 구독을 추가할 때마다 이 publication 등록을 빠뜨리지 않아야 한다 — RLS 정책 누락으로 인한 "성공했다는데 반영 안 됨"(UPDATE/DELETE silent failure)과 같은 계열의 "조용한 실패" 패턴이다.
+
+### 9.4 연결 관리
 
 ```typescript
 // collab.store.ts
 connectToGroup(groupId) → RealtimeChannel 생성 + 구독
 disconnectFromGroup()   → 채널 제거 (페이지 이탈 시)
+
+// notification.store.ts — NEW v1.6
+connect(userId) → RealtimeChannel 생성 + 구독
+disconnect()    → 채널 제거
 
 // 재연결 처리: Supabase 자동 재연결 (기본 설정)
 // 연결 상태 표시: isConnected boolean 상태
@@ -799,6 +908,9 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000  # 배포 시 실제 도메인
 | **/api/observations 5개 엔드포인트** | ⏳ 개발 예정 |
 | **ObservationForm / SeatSelector UI 컴포넌트** | ⏳ 개발 예정 |
 | **/observations 페이지 (3개)** | ⏳ 개발 예정 |
+| **`notifyUser()` 호출이 try/catch 없음 (NEW v1.6)** | `/api/approval`의 POST/PATCH에서 `notifications` insert 실패 시, 본 작업(승인 생성·처리·`applyDiffToPage`)이 이미 성공했어도 응답이 500으로 끝남 (§5.6) |
+| **SideBar `pendingCount` prop 죽은 코드 (NEW v1.6)** | `MainLayout`이 값을 계산·전달하지 않아 "승인 대기 N건" 박스가 항상 0 — 후속 정리 필요 (LLD §3.22) |
+| **migration 016 손상 파일 (NEW v1.6)** | `016_user_profiles_group_visibility.sql`이 1바이트("4")로 손상되어 있으나 cross-user RLS는 정상 동작 — 원인 불명 (LLD §1.6) |
 
 > **해결된 기술 부채 (v1.1)**
 > - ~~SideBar 역할 배지 표시 안 됨~~ → MainLayout server component prop 방식으로 완전 해결
@@ -833,11 +945,11 @@ D:\2. 연세대학원\workspace_app\storybridge\
 
 ### B. 참고 문서
 
-- PRD v3.1: `StoryBridge_PRD_v3_0.md`
-- HLD v2.1: `StoryBridge_HLD_v2.0.md`
-- LLD v2.1: `StoryBridge_LLD_v2.0.md`
-- Plan v2.1: `StoryBridge_Plan_v2.0.md`
-- DesignSpec v2.1: `StoryBridge_DesignSpec_v2.0.md`
+- PRD v3.6: `StoryBridge_PRD_v3_0.md`
+- HLD v2.6: `StoryBridge_HLD_v2.0.md`
+- LLD v2.7: `StoryBridge_LLD_v2.0.md`
+- Plan v2.7: `StoryBridge_Plan_v2.0.md`
+- DesignSpec v2.6: `StoryBridge_DesignSpec_v2.0.md`
 - WORKFLOW: `WORKFLOW.md`
 
 ---
@@ -903,5 +1015,21 @@ D:\2. 연세대학원\workspace_app\storybridge\
 
 ---
 
-*StoryBridge TDD v1.5 | 2026.06.09*  
+## v1.5 → v1.6 변경 요약 (2026.06.11)
+
+| 섹션 | 변경 내용 |
+|---|---|
+| §4.3 상태 관리 | `notification.store.ts` 신규 추가 (notifications:{userId} 채널, unreadCount, markAsRead/markAllAsRead) |
+| §4.5 (신규) | DiffViewer — LCS(최장 공통 부분열) 기반 토큰(단어) 단위 diff 알고리즘(tokenize/diffTokens) 신규 명세 |
+| §5.6 (신규) | 수정 제안 승인 플로우 — `proposal_reason`, `notifyUser`/`summarizeDiff`/`FIELD_LABELS`, POST/PATCH `/api/approval` 처리 흐름; `notifyUser` try/catch 미적용 주의사항 명시 |
+| §6.1 ERD | `notifications` 노드 추가 (user_profiles N:1, stories nullable FK) |
+| §6.2 테이블 설계 | `approvals.proposal_reason TEXT`, `notifications` 테이블 설계 결정 추가 |
+| §6.3 마이그레이션 | `006` 상태를 "개발 예정"→"실행 완료"로 정정, `007~014` 요약 행 추가, `015/017/018/019`(NEW v1.6) 및 `016`(손상 파일 ⚠️) 추가 |
+| §9 실시간 통신 | 전면 재구성 — §9.1 group:{groupId}(INSERT-only 한계 명시), §9.2 notifications:{userId} 채널 신규, §9.3 supabase_realtime publication 등록 필수 전제조건(migration 018) 신규, §9.4 연결 관리에 notification.store.ts 추가; 미구현 "Track별 생성 알림 분기"와의 차이 명시 |
+| §15.3 기술 부채 | `notifyUser` try/catch 미적용, SideBar `pendingCount` 죽은 코드, migration 016 손상 파일 3건 추가 |
+| 부록 B | 참고 문서 버전 표기를 헤더 참조(PRD v3.6/HLD v2.6/LLD v2.7/Plan v2.7/DesignSpec v2.6)와 동기화 |
+
+---
+
+*StoryBridge TDD v1.6 | 2026.06.11*  
 *연세대학교 심리과학이노베이션대학원 디지털혁신 트랙 — 강현정*

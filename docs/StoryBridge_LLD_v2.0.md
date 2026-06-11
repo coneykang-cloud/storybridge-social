@@ -1,10 +1,10 @@
 # StoryBridge LLD (Low-Level Design) v2.0
 
-**버전:** v2.6  
-**작성일:** 2026.06.05 / 최종 업데이트: 2026.06.09  
+**버전:** v2.7  
+**작성일:** 2026.06.05 / 최종 업데이트: 2026.06.11  
 **작성자:** 강현정  
-**참조:** PRD v3.5 / HLD v2.5 / TDD v1.5 / Plan v2.6.md  
-**변경 이력:** v1.0 → v2.0 (3-Track 모델, 청킹 2차원화, 누적 제시 UI 반영) / v2.0 → v2.1 (연령대 5구간, migration 004, ChildSelectorPanel, 타입 업데이트) / v2.1 → v2.2 (migration 004 실행 완료로 상태 정정, migration 005 stories DELETE RLS 정책 추가 반영) / v2.2 → v2.3 (behavior_observations 테이블 설계 및 API 추가) / v2.3 → v2.4 (마이그레이션 007~013 반영, 브릿지 책장·제목 인라인 수정·creator 삭제 권한 등 코드 구현 동기화) / v2.4 → v2.5 (이미지 생성 파이프라인 Replicate 전환 + 아바타 기반 캐릭터 일관성 함수 명세, TTS API·서비스 신규 추가 및 버그 수정 3건 반영) / v2.5 → v2.6 (아이(child) 역할 — migration 014, UserRole 타입 확장, 미들웨어 child 보호 로직, SideBar/BottomNavBar 필터링, BookshelfClient ChildConnectForm, 그룹 참여 API child 허용, Badge/Settings 컴포넌트 child 지원)
+**참조:** PRD v3.6 / HLD v2.6 / TDD v1.6 / Plan v2.7.md  
+**변경 이력:** v1.0 → v2.0 (3-Track 모델, 청킹 2차원화, 누적 제시 UI 반영) / v2.0 → v2.1 (연령대 5구간, migration 004, ChildSelectorPanel, 타입 업데이트) / v2.1 → v2.2 (migration 004 실행 완료로 상태 정정, migration 005 stories DELETE RLS 정책 추가 반영) / v2.2 → v2.3 (behavior_observations 테이블 설계 및 API 추가) / v2.3 → v2.4 (마이그레이션 007~013 반영, 브릿지 책장·제목 인라인 수정·creator 삭제 권한 등 코드 구현 동기화) / v2.4 → v2.5 (이미지 생성 파이프라인 Replicate 전환 + 아바타 기반 캐릭터 일관성 함수 명세, TTS API·서비스 신규 추가 및 버그 수정 3건 반영) / v2.5 → v2.6 (아이(child) 역할 — migration 014, UserRole 타입 확장, 미들웨어 child 보호 로직, SideBar/BottomNavBar 필터링, BookshelfClient ChildConnectForm, 그룹 참여 API child 허용, Badge/Settings 컴포넌트 child 지원) / v2.6 → v2.7 (알림 시스템 — notifications 테이블·notification.store.ts·`/notifications` 페이지, 수정 제안 승인 플로우 고도화 — proposal_reason·StoryPageEditor·승인 내역 탭·DiffViewer LCS 단어 단위 하이라이트·diff 요약 알림, 대시보드 승인 배너 다이렉트 이동, migration 015~019 반영)
 
 ---
 
@@ -153,7 +153,7 @@ CREATE TABLE public.story_pages (
 );
 ```
 
-### 1.5 approvals — v2 변경 (track 컬럼 추가)
+### 1.5 approvals — v2.7 변경 (proposal_reason 추가)
 
 ```sql
 CREATE TABLE public.approvals (
@@ -167,6 +167,8 @@ CREATE TABLE public.approvals (
                     CHECK (status IN ('pending', 'approved', 'rejected')),
   diff_before     JSONB NOT NULL DEFAULT '{}',
   diff_after      JSONB NOT NULL DEFAULT '{}',
+  proposal_reason TEXT,
+                    -- ★ NEW v2.7 (migration 017): 전문가가 수정 제안 시 함께 적는 사유 (선택)
   feedback        TEXT,
   created_at      TIMESTAMPTZ DEFAULT NOW(),
   resolved_at     TIMESTAMPTZ
@@ -189,6 +191,11 @@ CREATE TABLE public.approvals (
 | `012_groups_rls_policies_v3.sql` | groups/group_members 최종 RLS — `is_group_member()`/`is_child_parent()`를 `LANGUAGE plpgsql SECURITY DEFINER` 헬퍼로 분리해 cross-table 순환 해결 | ✅ 실행 완료 (2026-06-08) |
 | `013_stories_delete_creator.sql` | stories DELETE RLS에 `creator_id = auth.uid()` 조건 추가 (치료사 등 creator의 본인 생성 스토리 삭제 허용) | ✅ 실행 완료 (2026-06-08) |
 | `014_add_child_role.sql` | `user_profiles.role` 및 `group_members.role` CHECK 제약에 'child' 추가 — child 역할 회원가입 가능하도록 | ✅ 실행 완료 (2026-06-09) |
+| `015_notifications.sql` | `notifications` 테이블 신규 — 알림함(`/notifications`) 영속화. `type IN ('approval_request','approval_result','comment')`, RLS는 본인 알림만 SELECT/UPDATE 허용, INSERT는 service-role 전용(§1.9) | ✅ 실행 완료 (2026-06-11) |
+| `016_user_profiles_group_visibility.sql` | ⚠️ **파일 손상** — 1바이트, 내용이 문자 `"4"` 뿐인 빈 파일. 파일명상 "그룹 멤버 간 user_profiles 가시성 RLS"로 추정되나 실제 SQL이 없음. 그러나 런타임에서 cross-user `user_profiles` 조인(예: `approvals.requester:user_profiles(...)`, 협업 그룹 멤버 조회)은 RLS 하에서도 정상 동작함이 확인됨 — 원인 미상(별도 정책 또는 PostgREST/RLS 기본 동작 가능성), 후속 조사 필요 | ⚠️ 원인 불명 (현재 동작에는 영향 없음) |
+| `017_approval_proposal_reason.sql` | `approvals.proposal_reason TEXT` 컬럼 추가 — 전문가가 수정 제안 시 사유 입력 (§1.5) | ✅ 실행 완료 (2026-06-11) |
+| `018_realtime_publication.sql` | `approvals`/`comments`/`notifications` 테이블을 `supabase_realtime` publication에 추가 — 누락 시 `postgres_changes` 구독이 `SUBSCRIBED` 상태에서도 이벤트를 수신하지 못하는 silent failure 발생 (§6.3 of HLD v2.6) | ✅ 실행 완료 (2026-06-11) |
+| `019_notification_approval_sent.sql` | `notifications.type` CHECK 제약에 `'approval_sent'` 추가 — 제안을 보낸 전문가 본인에게도 "제안을 보냈어요 (대기중)" 알림을 생성하기 위함 | ✅ 실행 완료 (2026-06-11) |
 
 ### 1.7 v2 추가 마이그레이션 SQL
 
@@ -311,6 +318,39 @@ CREATE INDEX IF NOT EXISTS idx_observations_observed_at ON behavior_observations
 
 > **변경 이력:** 최초 설계(006)는 "치료사 본인만" 접근 가능한 `therapist_id` + `FOR ALL` 단일 정책이었으나, "보호자도 ABC를 기록하고 싶다"는 요구로 007에서 `recorder_id`/`recorder_role`로 일반화하고, 008에서 "그룹 멤버는 작성자 무관 조회 + 치료사는 타인 기록도 SEAT 보강 가능"하도록 SELECT/UPDATE를 확장했다.
 
+### 1.9 notifications — NEW v2.7 (migration 015, 019)
+
+```sql
+CREATE TABLE public.notifications (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+  type        TEXT NOT NULL CHECK (type IN ('approval_request', 'approval_result', 'approval_sent', 'comment')),
+                -- ↑ 'approval_sent'는 migration 019에서 추가 (CHECK 제약 재정의)
+  title       TEXT NOT NULL,
+  body        TEXT NOT NULL,
+  story_id    UUID REFERENCES stories(id) ON DELETE CASCADE,
+  is_read     BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_notifications_user_id ON notifications(user_id, is_read);
+
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "본인 알림 조회" ON notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "본인 알림 수정" ON notifications FOR UPDATE USING (auth.uid() = user_id);
+-- INSERT 정책 없음 — 알림은 항상 발신자가 수신자 본인이 아니므로
+-- API 라우트에서 createServiceClient()(service-role, RLS 우회)로만 INSERT한다.
+```
+
+> **`type` 값별 의미 (실제 구현 기준, §2.7):**
+> - `approval_request` — 전문가가 수정을 제안 → 보호자에게 발송
+> - `approval_sent` — 전문가 본인에게 "제안을 보냈어요 (승인 대기중)" 진행 상태 안내
+> - `approval_result` — 보호자가 승인/거절 처리 → 제안자(`requester_id`)에게 결과 발송
+> - `comment` — 타입은 정의돼 있으나 현재 어떤 라우트도 이 타입으로 INSERT하지 않음 (§6.2 of HLD v2.6, 자문 댓글에는 알림 미연동)
+>
+> **realtime 전제조건:** `notifications`은 migration 018에서 `supabase_realtime` publication에 추가되어야 `notification.store.ts`(§4.3)의 `postgres_changes` INSERT 구독이 정상 동작한다.
+
 ---
 
 ## 2. API 엔드포인트 명세
@@ -409,6 +449,8 @@ interface NotifyRequest {
 // Response
 { notified_count: number }
 ```
+
+> **구현 현황 (v2.7):** 위 `POST /api/story/[id]/notify` (Track 생성 시점 알림)는 **여전히 미구현 설계안**이다(HLD v2.6 §6.2). 실제로 동작 중인 알림 발송은 수정 제안 승인 플로우(`POST`/`PATCH /api/approval`)에 내장된 `notifyUser()` 헬퍼이며, §2.7에서 별도로 명세한다.
 
 ### 2.4 기존 API 변경사항
 
@@ -583,6 +625,103 @@ export async function synthesizeKorean(text: string, voice: TTSVoice):
 
 export function computeCacheKey(text: string, voice: TTSVoice): string
 ```
+
+### 2.7 수정 제안 승인 플로우 API — NEW v2.7 (구현 완료)
+
+**POST `/api/approval`** — `src/app/api/approval/route.ts`
+
+```typescript
+// Request
+interface CreateApprovalRequest {
+  story_id:    string
+  page_id?:    string
+  diff_before: Record<string, unknown>
+  diff_after:  Record<string, unknown>
+  reason?:     string   // 제안 사유 (canEditDirectly=false일 때만 의미 있음)
+}
+
+// 처리 흐름
+// 1. story.creator_id, story.track, children(parent_id)를 조회
+// 2. canEditDirectly = (user.id === story.creator_id) || (user.id === parentId)
+//    - 보호자 본인 또는 스토리 생성자는 승인 절차 없이 즉시 반영
+// 3. approvals INSERT
+//    - canEditDirectly=true  → status: 'approved', resolved_at: now()
+//    - canEditDirectly=false → status: 'pending', proposal_reason: reason ?? null
+// 4. canEditDirectly=true  → applyDiffToPage(page_id, diff_after) 즉시 실행
+//    canEditDirectly=false →
+//      a) parentId에게 notifyUser({ type: 'approval_request', title: '수정 제안', body: ... })
+//         body는 reason이 있으면 "{이름}님이 스토리 수정을 제안했어요: {reason}"
+//      b) 제안자 본인에게 notifyUser({ type: 'approval_sent', title: '제안을 보냈어요',
+//         body: summarizeDiff(diff_after) + ' (보호자 승인 대기중)' })  ← migration 019
+
+// Response
+{ approval: Approval }
+```
+
+**PATCH `/api/approval`** — 보호자 전용 승인/거절 처리
+
+```typescript
+// Request
+interface ResolveApprovalRequest {
+  id:        string
+  status:    'approved' | 'rejected'
+  feedback?: string   // 거절 시 사유 (선택)
+}
+
+// 처리 흐름
+// 1. user_profiles.role !== 'parent' → 403
+// 2. approvals.select('*, story:stories(child_id, children(parent_id))') 로 대상 조회
+// 3. approvals.update({ status, resolved_at: now(), feedback? })
+// 4. status === 'approved' && page_id 존재 → applyDiffToPage(page_id, diff_after)
+// 5. notifyUser({
+//      user_id: approval.requester_id,
+//      type: 'approval_result',
+//      title: status === 'approved' ? '제안이 승인됐어요' : '제안이 거절됐어요',
+//      body: approved → `${summarizeDiff(diff_after)} → 반영됐어요`
+//            rejected → feedback || `${summarizeDiff(diff_after)} 제안이 거절됐어요`
+//    })
+
+// Response
+{ approval: Approval }
+```
+
+**공통 헬퍼:**
+
+```typescript
+// 알림 INSERT — 수신자가 본인이 아닐 수 있으므로 항상 service-role 사용 (RLS 우회)
+async function notifyUser(payload: {
+  user_id: string
+  type: 'approval_request' | 'approval_result' | 'approval_sent'
+  title: string
+  body: string
+  story_id?: string
+}) {
+  const serviceClient = await createServiceClient()
+  await serviceClient.from('notifications').insert(payload)
+}
+
+// 변경된 필드를 사람이 읽을 수 있는 한 줄 요약으로 변환 (알림 본문용)
+const FIELD_LABELS: Record<string, string> = {
+  descriptive: '설명문',
+  perspective: '조망문',
+  coaching:    '지시문',
+}
+
+function truncate(text: string, max = 40): string {
+  return text.length > max ? `${text.slice(0, max)}...` : text
+}
+
+function summarizeDiff(diff: Partial<StoryPage>): string {
+  return Object.entries(diff)
+    .filter(([key]) => key in FIELD_LABELS)
+    .map(([key, value]) => `[${FIELD_LABELS[key]}] ${truncate(String(value))}`)
+    .join(' / ')
+}
+// 예: diff_after = { descriptive: "급식실에 줄을 서요..." }
+//   → "[설명문] 급식실에 줄을 서요..."
+```
+
+> **권한 모델 요약:** `canEditDirectly`(보호자 본인 또는 스토리 생성자)는 즉시 반영, 그 외 역할(`canPropose` — child 제외)은 `pending` 승인 요청 생성. 이 권한 분기는 `StoryPageEditor`(§3.18)에서도 동일하게 사용된다.
 
 ---
 
@@ -957,6 +1096,174 @@ export function BottomNavBar({ role }: { role?: UserRole | null }) {
 // MainLayout에서 <BottomNavBar role={role} /> 전달
 ```
 
+### 3.18 StoryPageEditor — NEW v2.7
+
+```typescript
+// src/components/story/StoryPageEditor.tsx
+interface Props {
+  storyId:         string
+  page:            StoryPage
+  canEditDirectly: boolean
+  canPropose:      boolean
+}
+
+const FIELDS = [
+  { key: 'descriptive', label: '설명문' },
+  { key: 'perspective', label: '조망문' },
+  { key: 'coaching',    label: '지시문' },
+] as const
+```
+
+**동작:**
+- `editable = canEditDirectly || canPropose` — 둘 다 false(예: child)면 연필 아이콘 미노출
+- 연필 아이콘 클릭 → `editing=true`, 3개 필드(설명문/조망문/지시문)를 `<Textarea>`로 인라인 편집
+- `canEditDirectly=false`일 때만 "제안 사유 (선택)" `<Textarea>` 추가 노출
+- 저장 시 `FIELDS`를 순회하며 `before !== after`인 필드만 `diff_before`/`diff_after`에 담아 `POST /api/approval` 호출 (§2.7)
+  - `canEditDirectly=true` → 응답 후 `router.refresh()`로 즉시 반영된 페이지 재조회
+  - `canEditDirectly=false` → "보호자에게 승인 요청을 보냈어요" 메시지만 표시 (페이지는 변경되지 않음 — 승인 대기)
+- 변경 사항이 없으면(`hasChanges=false`) 저장 버튼 비활성화
+
+**호출 위치:** `src/app/(main)/story/[id]/page.tsx`
+```typescript
+const isCreator = story.creator_id === user.id
+const canEditDirectly = isParent || isCreator
+const canPropose = role !== 'child' && !canEditDirectly
+// → 페이지별로 <StoryPageEditor storyId={story.id} page={page} canEditDirectly={canEditDirectly} canPropose={canPropose} />
+```
+
+### 3.19 ApprovalCard / ApprovalHistoryCard — v2.7 업데이트 (스토리/페이지 배지 + Diff 연동)
+
+```typescript
+// src/components/collab/ApprovalCard.tsx        — '승인 요청' 탭 (status='pending')
+// src/components/collab/ApprovalHistoryCard.tsx — '승인 내역' 탭 (status≠'pending', NEW v2.7)
+interface ApprovalCardProps        { approval: Approval; isParent: boolean }
+interface ApprovalHistoryCardProps { approval: Approval }
+```
+
+**공통 — 스토리/페이지 컨텍스트 배지 (NEW v2.7):**
+- `approval.story?.title` 또는 `approval.page?.page_number`가 있으면 카드 상단에 `📖 {제목} · {N}페이지` 형태로 표시
+- 어느 스토리·몇 페이지에 대한 제안인지 한눈에 식별 가능 (이전에는 diff만 보여 컨텍스트가 불명확했던 문제 해결)
+
+**ApprovalCard (승인 요청 탭):**
+- 헤더: 제안자 이름 + `<RoleBadge>` + 작성일(`created_at`)
+- `<DiffViewer before={diff_before} after={diff_after} />` (§3.20)
+- `proposal_reason`이 있으면 민트색 박스로 "제안 사유" 표시
+- `isParent`일 때만 승인/거절 버튼:
+  - 승인 → `useCollabStore().resolveApproval(id, 'approved')`
+  - 거절 → 거절 사유 `<Textarea>` 펼침 → `resolveApproval(id, 'rejected', feedback)` (사유 필수)
+
+**ApprovalHistoryCard (승인 내역 탭, NEW v2.7):**
+- 카드 배경: 승인됨 → `border-mint-300/60 bg-mint-50/40`, 거절됨 → `border-red-200 bg-red-50/40`
+- 헤더: 제안자 이름 + `<RoleBadge>` + 상태 `<Badge>`(✅ 승인됨 / ❌ 거절됨) + `resolved_at` 날짜
+- `<DiffViewer>` 동일 렌더링 (읽기 전용 — 버튼 없음)
+- `proposal_reason`(제안 사유) / 거절 시 `feedback`(거절 사유) 박스 표시
+
+### 3.20 DiffViewer — NEW v2.7 (LCS 토큰 단위 단어 하이라이트)
+
+```typescript
+// src/components/collab/DiffViewer.tsx
+interface DiffViewerProps { before: Partial<StoryPage>; after: Partial<StoryPage> }
+
+type DiffToken = { type: 'equal' | 'remove' | 'add'; value: string }
+
+// 공백 단위 토큰화 (공백 자체도 토큰으로 유지해 원문 간격 보존)
+function tokenize(text: string): string[] {
+  return text.split(/(\s+)/).filter((t) => t.length > 0)
+}
+
+// LCS(최장 공통 부분 수열) DP로 토큰 단위 diff 계산
+function diffTokens(before: string[], after: string[]): DiffToken[] {
+  // dp[i][j] = before[i..]와 after[j..]의 LCS 길이 (역방향 채움)
+  // 역추적: before[i]===after[j] → equal,
+  //         dp[i+1][j] >= dp[i][j+1] → remove(before[i]),
+  //         else → add(after[j])
+}
+```
+
+**렌더링:**
+- `FIELDS`(설명문/조망문/지시문) 중 `before[key] !== after[key]`인 필드만 2-컬럼(변경 전/변경 후) 그리드로 표시
+- 양쪽 값이 모두 존재하면 `diffTokens()`로 토큰화 후:
+  - **변경 전** (빨간 배경): `remove` 토큰을 `<mark class="bg-red-200 line-through">`로 강조, `add` 토큰은 제외
+  - **변경 후** (초록 배경): `add` 토큰을 `<mark class="bg-warning-amber/40">`로 강조, `remove` 토큰은 제외
+- 한쪽 값이 없으면(`undefined`) 토큰 비교 없이 전체 텍스트를 회색 배경에 그대로 표시
+- 변경된 필드가 하나도 없으면 "변경 내용이 없어요" 안내문 표시
+
+> **효과:** 기존에는 변경 전/후 전체 문단을 나란히 보여주기만 해 어느 단어가 바뀌었는지 알기 어려웠으나, 단어(공백 단위 토큰) 단위로 추가/삭제 부분만 하이라이트해 보호자가 변경 내용을 빠르게 파악할 수 있다.
+
+### 3.21 NotificationsClient — NEW v2.7
+
+```typescript
+// src/app/(main)/notifications/NotificationsClient.tsx
+interface Props { userId: string; initialNotifications: Notification[] }
+```
+
+**동작:**
+- 마운트 시 `setNotifications(initialNotifications)` 후 `connect(userId)`(§4.3) — 언마운트 시 `disconnect()`
+- `notificationIcon(notification)`: `approval_request`→🔔, `approval_result`→title에 "승인" 포함 시 ✅ 아니면 ❌, `approval_sent`→📤, `comment`→💬
+- 안 읽은 알림이 1건 이상이면 "모두 읽음으로 표시" 버튼(`markAllAsRead()`) 노출
+- 각 알림 카드 클릭 → `markAsRead(id)` 후 `notification.story_id`가 있으면 `/story/{story_id}`, 없으면 `/collab`으로 이동
+- 안 읽은 알림은 `border-mint-300 bg-mint-50/50` + 코랄색 점(dot)으로 강조
+- 빈 상태: "아직 알림이 없어요"
+
+**서버 컴포넌트:** `src/app/(main)/notifications/page.tsx` — `notifications.select('*').order('created_at', desc).limit(50)`을 RLS(본인 알림만)로 조회해 `initialNotifications`로 전달
+
+### 3.22 SideBar/BottomNavBar 알림 배지 — v2.7 업데이트
+
+```typescript
+// src/components/layout/SideBar.tsx
+const navItems = [
+  { href: '/dashboard',     icon: Home,          label: '홈' },
+  { href: '/profile',       icon: UserCircle,    label: '아이 프로필' },
+  { href: '/observations',  icon: ClipboardList, label: '행동 관찰하기' },
+  { href: '/story/create',  icon: BookPlus,      label: '스토리 만들기' },
+  { href: '/bookshelf',     icon: BookOpen,      label: '브릿지 책장' },
+  { href: '/collab',        icon: Users,         label: '협업 공간' },
+  { href: '/notifications', icon: Bell,          label: '알림' },   // ← NEW v2.7
+  { href: '/settings',      icon: Settings,      label: '설정' },
+]
+
+interface SideBarProps {
+  pendingCount?: number   // /collab 옆 배지 + 하단 "승인 대기 N건" 박스
+  unreadCount?: number    // /notifications 옆 배지 ← NEW v2.7
+  role?: UserRole | null
+}
+```
+
+- `unreadCount`는 `MainLayout`(`src/app/(main)/layout.tsx`)에서 `notifications.select('*', {count:'exact', head:true}).eq('is_read', false)`로 계산해 `<SideBar unreadCount={unreadCount} />`로 전달 — `/notifications` 메뉴에 `<Badge variant="count">` 표시
+- `BottomNavBar`도 동일하게 `unreadCount` prop을 받아 모바일 하단 탭의 "알림" 아이콘에 배지 표시
+
+> **⚠️ 기존 버그 (미수정, v2.7 시점):** `SideBarProps.pendingCount`와 이를 사용하는 `/collab` 메뉴 배지(77-79행) 및 사이드바 하단 "🔔 승인 대기 N건" 박스(89-96행)는 컴포넌트 내부에 그대로 남아 있으나, `MainLayout`이 `pendingCount`를 계산해 전달하지 않아 **항상 0으로 렌더링되지 않는 죽은 코드**다. 대시보드(§3.23)의 승인 대기 배너는 정상 동작하므로 사용자 영향은 제한적이지만, 사이드바 차원의 승인 대기 알림이 필요하다면 `MainLayout`에 `pendingCount` 계산·전달을 추가해야 한다.
+
+### 3.23 대시보드 승인 배너 다이렉트 이동 — NEW v2.7
+
+```typescript
+// src/app/(main)/dashboard/page.tsx
+const pendingRes = await supabase
+  .from('approvals')
+  .select('id, story:stories!inner(child_id)')
+  .eq('status', 'pending')
+
+const pendingApprovals = (pendingRes.data ?? []) as unknown as { id: string; story: { child_id: string } | null }[]
+const pendingCount = pendingApprovals.length
+
+// 승인 대기 건이 속한 그룹이 하나로 특정되면 해당 협업 공간으로 바로 이동
+let approvalGroupId: string | null = null
+if (pendingCount > 0) {
+  const pendingChildIds = [...new Set(pendingApprovals.map(a => a.story?.child_id).filter((id): id is string => !!id))]
+  if (pendingChildIds.length > 0) {
+    const { data: groups } = await supabase.from('groups').select('id, child_id').in('child_id', pendingChildIds)
+    const uniqueGroupIds = [...new Set((groups ?? []).map(g => g.id))]
+    if (uniqueGroupIds.length === 1) approvalGroupId = uniqueGroupIds[0]
+  }
+}
+const approvalLink = approvalGroupId ? `/collab/${approvalGroupId}` : '/collab'
+// Bell 아이콘 링크 + "승인 대기 N건" Card 배너 모두 href={approvalLink}
+```
+
+> **버그 이력 (2026-06-11 수정):** 보호자 대시보드의 "승인 대기 N건" 배너가 항상 `/collab`(협업 그룹 목록 페이지)로 연결돼 있었다. `/collab`은 그룹별 승인 정보를 전혀 보여주지 않으므로, 사용자가 배너를 클릭해도 "승인을 어디서 처리해야 하는지" 알 수 없는 문제가 있었다(승인 카드 자체는 `/collab/{groupId}`의 "승인 요청" 탭에서 정상 동작 — §3.19). 대기 중인 승인이 속한 그룹을 역추적해 그룹이 하나로 특정되면 `/collab/{groupId}`로 직접 이동하도록 수정.
+
+> **안 읽은 알림 배너 (NEW v2.7):** 대시보드에 `unreadCount > 0`일 때 "🔔 안 읽은 알림 N건" 배너(`/notifications`로 연결)도 함께 추가됨 — 역할 무관 전체 사용자 대상.
+
 ---
 
 ## 4. 상태 관리 설계 (Zustand)
@@ -991,6 +1298,57 @@ interface StoryStore {
   resetGeneration:      () => void
 }
 ```
+
+### 4.2 collab.store.ts — v2.7 변경 (승인 내역 상태 추가)
+
+```typescript
+// src/stores/collab.store.ts
+interface CollabStore {
+  pendingApprovals: Approval[]
+  approvalHistory:  Approval[]   // ★ NEW v2.7 — '승인 내역' 탭(§3.19) 데이터
+  comments:         Comment[]
+  channel:          RealtimeChannel | null
+
+  setPendingApprovals: (approvals: Approval[]) => void
+  setApprovalHistory:  (approvals: Approval[]) => void   // NEW v2.7
+  setComments:         (comments: Comment[]) => void
+  addComment:          (comment: Comment) => void
+
+  connectToGroup:    (groupId: string, storyIds: string[]) => void  // 채널: group:{groupId}
+  disconnectFromGroup: () => void
+
+  fetchPendingApprovals: (storyId?: string) => Promise<void>
+  requestApproval: (payload: { story_id: string; page_id?: string; diff_before: object; diff_after: object }) => Promise<Approval | null>
+  resolveApproval: (id: string, status: 'approved' | 'rejected', feedback?: string) => Promise<void>
+}
+```
+
+- `connectToGroup`: `group:{groupId}` 채널에서 `approvals`(INSERT, `story_id=in.(...)`) 및 `comments`(INSERT) 구독. 새 `pending` 승인이 INSERT되면 `pendingApprovals` 앞에 추가
+- `resolveApproval`: `PATCH /api/approval` 호출 후, 처리된 항목을 `pendingApprovals`에서 제거하고 **`approvalHistory` 맨 앞에 추가** (NEW v2.7) — 승인/거절 직후 별도 새로고침 없이 "승인 내역" 탭에 즉시 반영됨
+- realtime 구독은 INSERT 이벤트만 처리 — `pending → approved/rejected` UPDATE는 PATCH 응답을 받은 클라이언트가 직접 상태를 옮기는 방식이라, **다른 브라우저 세션**에서는 처리 결과가 realtime으로 즉시 반영되지 않고 새로고침이 필요함 (HLD v2.6 §6.1 INSERT-only caveat과 동일한 제약)
+
+### 4.3 notification.store.ts — NEW v2.7
+
+```typescript
+// src/stores/notification.store.ts
+interface NotificationStore {
+  notifications: Notification[]
+  unreadCount:   number
+  channel:       RealtimeChannel | null
+
+  setNotifications:  (notifications: Notification[]) => void
+  fetchNotifications: () => Promise<void>   // notifications.select('*').order(created_at desc).limit(50)
+  markAsRead:        (id: string) => Promise<void>
+  markAllAsRead:     () => Promise<void>
+
+  connect:    (userId: string) => void   // 채널: notifications:{userId}
+  disconnect: () => void
+}
+```
+
+- `connect(userId)`: `notifications:{userId}` 채널에서 `postgres_changes` INSERT를 `filter: user_id=eq.{userId}`로 구독 — 새 알림 도착 시 목록 맨 앞에 추가하고 `unreadCount`를 증가
+- `markAsRead`/`markAllAsRead`: 로컬 상태를 먼저 낙관적으로 갱신한 뒤 `notifications.update({ is_read: true })` 호출 (RLS: 본인 알림만 UPDATE 가능, §1.9)
+- `NotificationsClient`(§3.21)와 사이드바 배지(§3.22)가 모두 이 스토어를 통해 `unreadCount`를 공유
 
 ---
 
@@ -1166,8 +1524,14 @@ storybridge/src/
 │   │   │   ├── page.tsx                ← ObservationHistory + 새 기록 버튼
 │   │   │   ├── new/page.tsx            ← ObservationForm (신규 입력)
 │   │   │   └── [id]/page.tsx           ← 관찰 상세 + SeatSelector + StoryLinkButton
-│   │   ├── dashboard/page.tsx          ← v2.3: "전체 보기" 링크를 죽은 /story → /bookshelf로 수정
-│   │   └── layout.tsx                  ← v2.1: user_metadata.role → SideBar prop
+│   │   ├── 🆕 notifications/            ← NEW v2.7: 알림함 (§3.21)
+│   │   │   ├── page.tsx                ← 서버 컴포넌트, notifications RLS-only 조회 (limit 50)
+│   │   │   └── NotificationsClient.tsx ← realtime 구독 + 읽음 처리 + 알림 클릭 라우팅
+│   │   ├── collab/[groupId]/
+│   │   │   ├── page.tsx                ← v2.7: approvalHistory 쿼리(`status≠pending`) 추가
+│   │   │   └── CollabPageClient.tsx    ← v2.7: 탭 구조 — 승인 요청 / 승인 내역(NEW) / 자문 댓글 / 멤버
+│   │   ├── dashboard/page.tsx          ← v2.7: 승인 대기 배너 → approvalGroupId 다이렉트 이동(§3.23) + 안 읽은 알림 배너
+│   │   └── layout.tsx                  ← v2.7: notifications unread count → SideBar/BottomNavBar unreadCount prop
 │   │
 │   └── api/
 │       ├── story/
@@ -1176,6 +1540,7 @@ storybridge/src/
 │       │   │   ├── route.ts             ← v2.3: PATCH(title만, creator 검증) + DELETE(parent OR creator) 재작성
 │       │   │   └── chunking/route.ts    ← NEW v2: 청킹 전략 수정 (치료사 전용, 미구현)
 │       │   └── pool/route.ts            ← Story Pool API
+│       ├── approval/route.ts            ← v2.7: notifyUser()/summarizeDiff() 추가 — POST/PATCH 처리 시 알림 INSERT (§2.7)
 │       └── observations/
 │           └── [id]/story-input/route.ts ← v2.3: raw_input을 ABC 4-섹션 순서로 재구성, recorder_id 필터 제거
 │
@@ -1189,20 +1554,28 @@ storybridge/src/
 │   │   ├── ChildSelectorPanel.tsx       ← NEW v2.1 ✅ (아이 선택 패널)
 │   │   ├── EditableStoryTitle.tsx       ← NEW v2.3 ✅ (제목 인라인 수정, creator 전용)
 │   │   ├── DeleteStoryButton.tsx        ← v2.3 ✅ (노출 조건 isParent || isCreator로 확장)
+│   │   ├── StoryPageEditor.tsx          ← NEW v2.7 ✅ (인라인 수정/제안, §3.18)
 │   │   ├── SixWHGuide.tsx               ← 유지 ✅
 │   │   ├── ChunkingSelector.tsx         ← 구형 잔존 (통합 예정)
 │   │   └── StoryViewer.tsx              ← v2 수정 ✅ (CumulativeStrip + TrackBadge)
+│   ├── collab/
+│   │   ├── ApprovalCard.tsx             ← v2.7: 스토리/페이지 배지 + DiffViewer 연동 (§3.19)
+│   │   ├── ApprovalHistoryCard.tsx      ← NEW v2.7 ✅ (승인 내역 탭, §3.19)
+│   │   ├── DiffViewer.tsx               ← NEW v2.7 ✅ (LCS 단어 단위 하이라이트, §3.20)
+│   │   └── CommentThread.tsx            ← 유지 ✅ (자문 댓글)
 │   └── layout/
-│       ├── SideBar.tsx                  ← v2.3: "브릿지 책장"(BookOpen) 메뉴 추가
-│       └── BottomNavBar.tsx             ← v2.3: "책장"(BookOpen) 메뉴 추가
+│       ├── SideBar.tsx                  ← v2.7: '알림' 메뉴 + unreadCount 배지 (§3.22)
+│       └── BottomNavBar.tsx             ← v2.7: unreadCount 배지 (§3.22)
 │
 ├── stores/
 │   ├── story.store.ts                   ← v2 부분 구현 (Track 파라미터 완성 예정)
 │   ├── child.store.ts                   ← NEW v2.1 ✅
-│   └── auth.store.ts / ui.store.ts / collab.store.ts
+│   ├── collab.store.ts                  ← v2.7: approvalHistory 상태 추가 (§4.2)
+│   ├── notification.store.ts            ← NEW v2.7 ✅ (§4.3)
+│   └── auth.store.ts / ui.store.ts
 │
 ├── types/
-│   └── app.types.ts                     ← v2.1 완성 (5구간, Track, Chunking 상수) + observation_id(v3.2)
+│   └── app.types.ts                     ← v2.7: Notification 인터페이스 신규, Approval에 proposal_reason/story/page 추가 (§7)
 │
 └── lib/
     ├── openai/
@@ -1224,7 +1597,7 @@ storybridge/src/
 ## 7. TypeScript 타입 정의
 
 ```typescript
-// types/app.types.ts — v2.1 최신 (실제 코드 기준)
+// types/app.types.ts — v2.7 최신 (실제 코드 기준)
 
 // ── 기본 타입 ────────────────────────────────────────────────
 
@@ -1317,6 +1690,40 @@ export interface GenerateStoryInput {
   observation_id?:          string   // v3.2 신규: ABC 관찰 연결 (story-input 응답에서 전달)
 
   avatar_id?:               string
+}
+
+// ── Approval 인터페이스 — v2.7 확장 ─────────────────────────
+
+export interface Approval {
+  id:              string
+  story_id:        string
+  page_id?:        string
+  requester_id:    string
+  track?:          Track
+  status:          ApprovalStatus
+  diff_before:     Partial<StoryPage>
+  diff_after:      Partial<StoryPage>
+  proposal_reason?: string   // ★ NEW v2.7 (migration 017) — 제안 사유, ApprovalCard/ApprovalHistoryCard에 표시
+  feedback?:       string    // 거절 사유
+  created_at:      string
+  resolved_at?:    string
+  requester?:      UserProfile
+  story?:          { title: string }              // ★ NEW v2.7 — 카드 상단 스토리/페이지 배지(§3.19)용 조인
+  page?:           { page_number: number } | null // ★ NEW v2.7
+}
+
+// ── Notification 인터페이스 — NEW v2.7 ──────────────────────
+
+export interface Notification {
+  id:         string
+  user_id:    string
+  type:       'approval_request' | 'approval_result' | 'approval_sent' | 'comment' | 'track_notify'
+  // ↑ 'comment'/'track_notify'는 타입만 정의돼 있고 현재 어떤 라우트도 INSERT하지 않음 (§1.9)
+  title:      string
+  body:       string
+  story_id?:  string
+  is_read:    boolean
+  created_at: string
 }
 
 // ── ChunkingConfig ───────────────────────────────────────────
@@ -1485,4 +1892,20 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 ---
 
-*StoryBridge LLD v2.6 | 2026.06.09*
+## v2.6 → v2.7 변경 요약 (2026.06.11)
+
+| 섹션 | 변경 내용 |
+|---|---|
+| §1.5 approvals | `proposal_reason TEXT` 컬럼 추가 (migration 017) — 전문가 제안 사유 |
+| §1.6 마이그레이션 | 015(notifications 테이블), 016(⚠️ 1바이트 손상 파일, 원인 불명), 017(proposal_reason), 018(realtime publication 추가), 019(notifications.type에 'approval_sent' 추가) 행 신규 |
+| §1.9 신규 | `notifications` 테이블 DDL + RLS(본인만 SELECT/UPDATE, INSERT는 service-role) + `type` 값별 의미 + realtime 전제조건(migration 018) |
+| §2.3 | `/api/story/[id]/notify`(Track 알림)는 여전히 미구현 설계안임을 명시, 실제 구현은 §2.7로 분리 |
+| §2.7 신규 | `POST`/`PATCH /api/approval` 전체 플로우 — `canEditDirectly` 분기, `notifyUser()`/`summarizeDiff()`/`FIELD_LABELS` 헬퍼, 알림 3종(`approval_request`/`approval_sent`/`approval_result`) 발송 조건 |
+| §3.18~3.23 신규 | `StoryPageEditor`(인라인 수정/제안), `ApprovalCard`/`ApprovalHistoryCard`(스토리·페이지 배지 + 승인 내역 탭), `DiffViewer`(LCS 단어 단위 하이라이트), `NotificationsClient`, `SideBar`/`BottomNavBar` 알림 배지(+ `pendingCount` dead code 주의), 대시보드 승인 배너 다이렉트 이동(2026-06-11 버그 수정) |
+| §4.2~4.3 신규 | `collab.store.ts`에 `approvalHistory` 상태 추가; `notification.store.ts`(채널 `notifications:{userId}`) 신규 명세 |
+| §6 파일구조 | `/notifications` 라우트, `ApprovalHistoryCard`/`DiffViewer`/`StoryPageEditor`/`notification.store.ts` 등 신규 파일 반영; `/api/approval` 알림 로직 추가 명시 |
+| §7 타입 | `Approval`에 `proposal_reason`/`story`/`page` 추가; `Notification` 인터페이스 신규 |
+
+---
+
+*StoryBridge LLD v2.7 | 2026.06.11*

@@ -1,10 +1,10 @@
 # StoryBridge 디자인 명세 (Design Spec) v2.0
 
-**버전:** v2.5  
-**작성일:** 2026.06.05 / 최종 업데이트: 2026.06.09  
+**버전:** v2.6  
+**작성일:** 2026.06.05 / 최종 업데이트: 2026.06.11  
 **작성자:** 강현정  
-**참조:** PRD v3.5 / HLD v2.5 / LLD v2.6  
-**변경 이력:** v1.0 → v2.0 (3-Track 모델, ChunkingStrategyPanel, CumulativeStrip, TrackBadge 반영) / v2.0 → v2.1 (ChildSelectorPanel 명세 추가, 연령대 5구간 라벨 업데이트) / v2.1 → v2.2 (ObservationForm, SeatSelector, StoryLinkButton 컴포넌트 명세 추가; 행동 관찰 화면 레이아웃 추가) / v2.2 → v2.3 (EditableStoryTitle·DeleteStoryButton·BookshelfClient 컴포넌트 명세, 브릿지 책장 화면 레이아웃, 스토리 상세 화면의 죽은 "편집" 버튼 → 인라인 제목 수정으로 교체) / v2.3 → v2.4 (스토리 뷰어 §5.5/5.6 목업에 페이지 일러스트 아바타 캐릭터 일관성 반영 및 "읽어주기" 버튼 정상화 이력 주석 추가) / v2.4 → v2.5 (아이(child) 역할 — 역할 배지 yellow-100 색상, 회원가입 역할 선택 4번째 옵션, SideBar/BottomNavBar 아이 전용 2개 메뉴, 브릿지 책장 아이 모드 ChildConnectForm 화면 레이아웃 신규)
+**참조:** PRD v3.6 / HLD v2.6 / LLD v2.7  
+**변경 이력:** v1.0 → v2.0 (3-Track 모델, ChunkingStrategyPanel, CumulativeStrip, TrackBadge 반영) / v2.0 → v2.1 (ChildSelectorPanel 명세 추가, 연령대 5구간 라벨 업데이트) / v2.1 → v2.2 (ObservationForm, SeatSelector, StoryLinkButton 컴포넌트 명세 추가; 행동 관찰 화면 레이아웃 추가) / v2.2 → v2.3 (EditableStoryTitle·DeleteStoryButton·BookshelfClient 컴포넌트 명세, 브릿지 책장 화면 레이아웃, 스토리 상세 화면의 죽은 "편집" 버튼 → 인라인 제목 수정으로 교체) / v2.3 → v2.4 (스토리 뷰어 §5.5/5.6 목업에 페이지 일러스트 아바타 캐릭터 일관성 반영 및 "읽어주기" 버튼 정상화 이력 주석 추가) / v2.4 → v2.5 (아이(child) 역할 — 역할 배지 yellow-100 색상, 회원가입 역할 선택 4번째 옵션, SideBar/BottomNavBar 아이 전용 2개 메뉴, 브릿지 책장 아이 모드 ChildConnectForm 화면 레이아웃 신규) / v2.5 → v2.6 (알림 시스템 — NotificationsClient·`/notifications` 페이지·SideBar/BottomNavBar 알림 배지 신규 컴포넌트/화면 추가, 수정 제안 승인 플로우 고도화 — StoryPageEditor·proposal_reason 입력란·'승인 내역' 탭·DiffViewer LCS 단어 단위 하이라이트, 대시보드 승인 배너 다이렉트 이동 + 안 읽은 알림 배너)
 
 ---
 
@@ -398,6 +398,166 @@ Track C: bg-orange-100
 - 카드: `bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden`
 - 표지: `aspect-[3/4] object-cover bg-lavender-100` (이미지 없을 시 📖 placeholder)
 - 필터 칩: `TrackBadge`와 동일한 Track별 색상 체계 재사용 (Lavender/Mint/Peach)
+
+---
+
+### 4.12 StoryPageEditor — NEW v2.6 (페이지별 인라인 수정/제안)
+
+```
+┌──────────────────────────────────────────┐
+│ 3 / 8 페이지                    [✏️ 수정] │  ← canEditDirectly: "수정", canPropose: "제안"
+├──────────────────────────────────────────┤
+│ 설명문                                    │
+│ ┌──────────────────────────────────────┐ │
+│ │ 줄 맨 뒤에 서서 내 차례를 기다려요.   │ │
+│ └──────────────────────────────────────┘ │
+│                                          │
+│ 조망문                                    │
+│ ┌──────────────────────────────────────┐ │
+│ │ 선생님은 모두가 기다리면 더 빨리      │ │
+│ │ 밥을 먹을 수 있다고 생각해요.        │ │
+│ └──────────────────────────────────────┘ │
+│                                          │
+│ 지시문 (선택)                             │
+│ ┌──────────────────────────────────────┐ │
+│ │ (작성 시 코칭 문구로 표시됩니다)      │ │
+│ └──────────────────────────────────────┘ │
+│ ──────────────────────────────────────  │
+│ 💬 제안 사유 (선택)         ← canPropose만│
+│ ┌──────────────────────────────────────┐ │
+│ │ 이 표현이 더 명확할 것 같아요         │ │
+│ └──────────────────────────────────────┘ │
+│            [취소]   [제안 보내기 →]       │  ← canEditDirectly는 "저장하기"
+└──────────────────────────────────────────┘
+```
+
+**Props:** `{ page: StoryPage, storyId: string, canEditDirectly: boolean, canPropose: boolean }`
+
+**동작:**
+- `FIELDS = [{ key: 'descriptive', label: '설명문' }, { key: 'perspective', label: '조망문' }, { key: 'coaching', label: '지시문' }]` 3개 필드를 각각 텍스트에어리어로 렌더링
+- `canEditDirectly`(보호자 또는 스토리 creator): `[저장하기]` 클릭 → `PATCH /api/approval`로 `applyDiffToPage()` 즉시 반영, 별도 승인 절차 없음
+- `canPropose`(그 외 역할, child 제외): `[제안 보내기]` 클릭 → 제안 사유 입력란이 추가로 노출되고, `POST /api/approval`로 `pending` 상태 승인 요청 생성 (보호자에게 `approval_request` 알림 발송)
+- `child` 역할에게는 수정/제안 버튼 자체가 노출되지 않음 (읽기 전용)
+- 사용 위치: `/story/[id]` 상세 페이지의 각 페이지 카드 하단
+
+**스타일:**
+- 컨테이너: `bg-white border border-gray-100 rounded-2xl p-4`
+- 필드 레이블: `text-charcoal font-medium text-sm mb-1`
+- 텍스트에어리어: `border border-gray-200 rounded-xl p-3 text-base`
+- "수정" 버튼(직접 수정 가능): `bg-mint-200 text-charcoal`
+- "제안" 버튼(제안만 가능): `bg-lavender-200 text-charcoal`
+- 제안 사유 입력란: `border border-lavender-200 rounded-xl p-2 text-sm`, 레이블에 💬 아이콘
+
+---
+
+### 4.13 ApprovalCard / ApprovalHistoryCard — v2.6 업데이트 (스토리·페이지 배지 + 제안 사유)
+
+**ApprovalCard (대기 중, '승인 대기' 탭):**
+```
+┌──────────────────────────────────────────┐
+│ 📖 급식 줄 서기 · 3페이지        [대기중] │  ← NEW: 스토리 제목 + 페이지 번호 배지
+│ 🩺 김민지 (치료사) · 2026.06.11 14:32     │
+├──────────────────────────────────────────┤
+│ [DiffViewer: 변경 전 / 변경 후]            │
+├──────────────────────────────────────────┤
+│ 💬 제안 사유                              │  ← NEW (proposal_reason, 작성 시에만 표시)
+│ "이 표현이 더 명확할 것 같아요"           │
+├──────────────────────────────────────────┤
+│            [거절]      [승인 ✓]           │
+└──────────────────────────────────────────┘
+```
+
+**ApprovalHistoryCard (처리 완료, '승인 내역' 탭 — NEW v2.6):**
+```
+┌──────────────────────────────────────────┐
+│ 📖 급식 줄 서기 · 3페이지       [승인됨 ✓]│  ← 또는 [거절됨 ✕]
+│ 🩺 김민지 (치료사) → 처리: 2026.06.11 15:01│
+├──────────────────────────────────────────┤
+│ [DiffViewer: 변경 전 / 변경 후 — 읽기 전용]│
+├──────────────────────────────────────────┤
+│ 💬 제안 사유: "이 표현이 더 명확할 것..." │
+└──────────────────────────────────────────┘
+```
+
+**Props:** `{ approval: Approval & { story?: { title }, page?: { page_number } | null } }`
+
+**동작:**
+- 스토리/페이지 배지(`📖 {story.title} · {page.page_number}페이지`)는 PostgREST embed로 함께 조회한 `story`/`page` 정보로 렌더링 — 어떤 스토리·페이지에 대한 제안인지 식별 가능 (이전엔 변경 diff만 보이고 대상 컨텍스트가 없었음)
+- `proposal_reason`이 있을 때만 💬 박스 표시, 없으면 생략
+- ApprovalCard: `[승인 ✓]`/`[거절]` 클릭 → `PATCH /api/approval`로 처리, 처리 후 `collab.store.ts`가 해당 항목을 `approvalHistory`로 이동시켜 '승인 내역' 탭에 즉시 반영
+- ApprovalHistoryCard: 액션 버튼 없음, 상태 배지(`승인됨 ✓` Success Green / `거절됨 ✕` Coral)만 표시, 시간순 정렬
+
+**스타일:**
+- 컨테이너: `bg-white border border-gray-100 rounded-2xl p-4`
+- 스토리/페이지 배지: `inline-flex items-center gap-1 text-xs text-soft-gray bg-gray-50 rounded-lg px-2 py-1`
+- 대기중 배지: `bg-warning-amber/20 text-warning-amber`
+- 승인됨 배지: `bg-mint-100 text-mint-700`
+- 거절됨 배지: `bg-coral-100 text-coral-500`
+- 제안 사유 박스: `bg-lavender-50 border border-lavender-100 rounded-xl p-2 text-sm italic`
+
+---
+
+### 4.14 DiffViewer — NEW v2.6 (LCS 기반 단어 단위 하이라이트)
+
+```
+변경 전                          변경 후
+┌────────────────────────┐      ┌────────────────────────┐
+│ 줄 맨 뒤에 서서 내      │      │ 줄 맨 뒤에 서서 내      │
+│ 차례를 ~~기다려요~~.   │      │ 차례를 ▒조용히▒        │
+│                        │      │ ▒기다려요▒.            │
+└────────────────────────┘      └────────────────────────┘
+   ~~취소선~~ = 삭제된 단어         ▒음영▒ = 추가된 단어
+```
+
+**Props:** `{ before: string, after: string }`
+
+**동작:**
+- `tokenize(text)`: `text.split(/(\s+)/)`로 공백을 보존하며 단어 단위 토큰화
+- `diffTokens(beforeTokens, afterTokens)`: LCS(최장 공통 부분열) DP 테이블을 계산해 각 토큰을 `equal`/`remove`/`add`로 분류
+- 좌측(변경 전) 컬럼에는 `equal` + `remove` 토큰만, 우측(변경 후) 컬럼에는 `equal` + `add` 토큰만 렌더링 — 문단 전체가 아닌 **달라진 단어/구절만** 하이라이트되어 어디가 바뀌었는지 한눈에 파악 가능 (이전엔 두 문단을 통째로 나란히 보여주기만 했음)
+
+**스타일:**
+- 컨테이너: `grid grid-cols-2 gap-3`
+- 컬럼 헤더: `text-xs text-soft-gray font-medium mb-1` ("변경 전" / "변경 후")
+- 컬럼 박스: `bg-gray-50 rounded-xl p-3 text-sm leading-relaxed`
+- 삭제된 토큰(`remove`): `text-coral-500 line-through bg-coral-50 rounded px-0.5`
+- 추가된 토큰(`add`): `bg-warning-amber/30 text-charcoal font-medium rounded px-0.5`
+- 변경 없는 토큰(`equal`): 기본 텍스트 스타일
+
+---
+
+### 4.15 NotificationsClient — NEW v2.6
+
+```
+┌──────────────────────────────────────────┐
+│ 🔔 알림                  [모두 읽음으로]  │
+├──────────────────────────────────────────┤
+│ ●📩 김민지 치료사가 수정을 제안했어요     │  ← unread: 좌측 ● 점 + 굵은 글씨
+│   [설명문] "기다려요" → "조용히 기다려요" │     (summarizeDiff 결과)
+│   📖 급식 줄 서기 · 3페이지 · 2분 전      │
+├──────────────────────────────────────────┤
+│  ✅ 보호자가 제안을 승인했어요            │  ← read: 흐림, ● 없음
+│   📖 급식 줄 서기 · 3페이지 · 1시간 전    │
+├──────────────────────────────────────────┤
+│  📤 내가 보낸 제안이 전달되었어요         │  ← approval_sent (제안자 본인용)
+│   📖 등원 인사 · 1페이지 · 어제           │
+└──────────────────────────────────────────┘
+```
+
+**Props:** `{ notifications: Notification[] }`
+
+**동작:**
+- `notificationIcon`: `type`에 따라 아이콘 분기 — `approval_request` → 📩, `approval_sent` → 📤, `approval_result`(승인) → ✅ / (거절) → ❌, `comment` → 💬
+- 항목 클릭 → `markAsRead(id)` 호출 후 `story_id`(있으면 `/story/{id}` 또는 `/collab/{groupId}`)로 이동
+- `[모두 읽음으로]` 버튼 → `markAllAsRead()` 호출, 모든 항목을 읽음 상태로 일괄 전환
+- 본문(`body`)은 서버에서 `summarizeDiff()`로 생성된 한 줄 요약(`[설명문] "..." → "..."`)을 그대로 표시
+
+**스타일:**
+- 리스트 컨테이너: `divide-y divide-gray-100`
+- 안 읽음 항목: `bg-mint-50/40`, 좌측에 `w-2 h-2 rounded-full bg-coral-500` 점 표시, `font-semibold`
+- 읽은 항목: `opacity-60`
+- 항목 메타(스토리·페이지·시간): `text-xs text-soft-gray mt-1`
+- "모두 읽음으로" 버튼: `text-sm text-mint-700 hover:underline`
 
 ---
 
@@ -817,6 +977,103 @@ SideBar (PC):                    BottomNavBar (모바일):
 
 ---
 
+### 5.13 협업 공간 — 승인 대기 / 승인 내역 탭 — v2.6 업데이트
+
+```
+┌──────────────────────────────────────────┐
+│ ← 대시보드        민준이의 협업 공간      │
+├──────────────────────────────────────────┤
+│ [승인 대기 (1)] [승인 내역] [댓글] [멤버] │  ← '승인 내역' 탭 NEW v2.6
+├──────────────────────────────────────────┤
+│ ┌── ApprovalCard ──────────────────────┐ │
+│ │ 📖 급식 줄 서기 · 3페이지   [대기중] │ │  ← NEW: 스토리/페이지 배지
+│ │ 🩺 김민지 (치료사) · 06.11 14:32     │ │
+│ │ [DiffViewer 변경 전/후, 단어 하이라이트]│
+│ │ 💬 "이 표현이 더 명확할 것 같아요"   │ │  ← NEW: proposal_reason
+│ │            [거절]      [승인 ✓]      │ │
+│ └────────────────────────────────────┘ │
+└──────────────────────────────────────────┘
+```
+
+**'승인 내역' 탭 (처리 완료 항목, 시간순):**
+```
+┌──────────────────────────────────────────┐
+│ [승인 대기] [승인 내역 ✓] [댓글] [멤버]   │
+├──────────────────────────────────────────┤
+│ ┌── ApprovalHistoryCard ───────────────┐ │
+│ │ 📖 등원 인사 · 1페이지     [승인됨 ✓]│ │
+│ │ 👩‍🏫 박서준 (교사) → 06.10 09:15      │ │
+│ │ [DiffViewer 변경 전/후 — 읽기 전용]   │ │
+│ └────────────────────────────────────┘ │
+│ ┌── ApprovalHistoryCard ───────────────┐ │
+│ │ 📖 짝꿍 놀이 · 5페이지     [거절됨 ✕]│ │
+│ │ 🩺 김민지 (치료사) → 06.09 11:02      │ │
+│ │ [DiffViewer 변경 전/후 — 읽기 전용]   │ │
+│ └────────────────────────────────────┘ │
+└──────────────────────────────────────────┘
+```
+
+**동작:**
+- 처리 전: `ApprovalCard` 목록 (`collab.store.ts`의 `approvals` — `status === 'pending'`)
+- 처리 후: `[승인 ✓]`/`[거절]` 클릭 시 `PATCH /api/approval`이 처리되고, 해당 항목이 실시간으로 `approvals`에서 빠지고 `approvalHistory`로 이동 → '승인 내역' 탭에 즉시 등장
+- '승인 내역' 탭의 항목은 Track 구분 없이 처리 시각 역순(최신순)으로 표시
+
+---
+
+### 5.14 알림 페이지 (`/notifications`) — NEW v2.6
+
+```
+┌──────────────────────────────────────────┐
+│ ← 대시보드          🔔 알림              │
+│                          [모두 읽음으로]  │
+├──────────────────────────────────────────┤
+│ ●📩 김민지 치료사가 수정을 제안했어요     │
+│   [설명문] "기다려요" → "조용히 기다려요" │
+│   📖 급식 줄 서기 · 3페이지 · 2분 전      │
+├──────────────────────────────────────────┤
+│  ✅ 보호자가 제안을 승인했어요            │
+│   📖 급식 줄 서기 · 3페이지 · 1시간 전    │
+├──────────────────────────────────────────┤
+│  📤 내가 보낸 제안이 전달되었어요         │
+│   📖 등원 인사 · 1페이지 · 어제           │
+├──────────────────────────────────────────┤
+│  💬 박서준 교사가 댓글을 남겼어요         │
+│   📖 짝꿍 놀이 · 5분 전                   │
+└──────────────────────────────────────────┘
+```
+
+**진입 경로:** `SideBar`(PC) / `BottomNavBar`(모바일)에 `🔔 알림` 메뉴 추가, 안 읽은 알림 수만큼 빨간 배지 표시 (`unreadCount`)
+
+**조회 범위:** `notifications` 테이블을 `user_id = session.user.id`로 필터링한 본인 알림만 (RLS, migration 015) — 클릭 시 `markAsRead` 후 관련 스토리/협업 공간으로 이동 (§4.15 NotificationsClient)
+
+---
+
+### 5.15 대시보드 — 승인 배너 다이렉트 이동 + 안 읽은 알림 배너 — v2.6 업데이트
+
+```
+┌──────────────────────────────────────────┐
+│ 안녕하세요, 강현정님 👋                   │
+├──────────────────────────────────────────┤
+│ 🔔 안 읽은 알림 1건이 있어요  →           │  ← NEW: /notifications로 이동
+├──────────────────────────────────────────┤
+│ ⏳ 승인 대기 1건이 있어요  →              │  ← /collab/{groupId}로 다이렉트 이동
+├──────────────────────────────────────────┤
+│ [아이별 카드: 민준 / 서연 / 준우]         │
+└──────────────────────────────────────────┘
+```
+
+**동작 (버그 수정, 2026-06-11):**
+- **이전:** "승인 대기 N건" 배너가 항상 `/collab`(그룹 목록 페이지, 승인 정보 없음)로 연결되어 클릭해도 어떤 승인인지 찾을 수 없었음
+- **수정 후:** 대시보드 서버 컴포넌트에서 보호자의 대기 중 승인을 그룹별로 집계해 `approvalGroupId`를 계산 — 대기 승인이 속한 그룹이 하나로 특정되면 배너가 `/collab/{approvalGroupId}`로 직접 연결되어, 클릭 즉시 해당 협업 공간의 '승인 대기' 탭으로 이동
+- **신규:** "안 읽은 알림 N건" 배너가 `notifications` 테이블의 `is_read = false` 개수를 집계해 표시, 클릭 시 `/notifications`로 이동
+
+**스타일:**
+- 알림 배너: `bg-mint-50 border border-mint-200 rounded-xl px-4 py-3 flex items-center justify-between`
+- 승인 대기 배너: `bg-warning-amber/10 border border-warning-amber/30 rounded-xl px-4 py-3`
+- 두 배너 모두 우측에 `→` 화살표 아이콘, `hover:shadow-sm transition-shadow`
+
+---
+
 ## 6. PPT 슬라이드 구조 v2
 
 ### v2 업데이트 슬라이드 구성 (17슬라이드)
@@ -940,6 +1197,14 @@ SideBar (PC):                    BottomNavBar (모바일):
 | 브릿지 책장 (BookshelfClient, 내비) | `book` (Tabler) + 📖 |
 | 제목 인라인 수정 (EditableStoryTitle) | `pencil` (Tabler) + ✏️ |
 | 스토리 삭제 (DeleteStoryButton) | `trash` (Tabler) + 🗑 |
+| 알림 (NotificationsClient, 내비 배지) | `bell` (Tabler) + 🔔 — NEW v2.6 |
+| 알림 - 제안 도착 (approval_request) | 📩 — NEW v2.6 |
+| 알림 - 제안 발신 확인 (approval_sent) | 📤 — NEW v2.6 |
+| 알림 - 승인/거절 결과 (approval_result) | ✅ / ❌ — NEW v2.6 |
+| 페이지별 수정/제안 (StoryPageEditor) | `edit` (Tabler) + ✏️ — NEW v2.6 |
+| 변경 내용 비교 (DiffViewer) | `git-compare` (Tabler) — NEW v2.6 |
+| 제안 사유 (proposal_reason) | `message-circle` (Tabler) + 💬 — NEW v2.6 |
+| 승인 내역 탭 | `history` (Tabler) — NEW v2.6 |
 
 ---
 
@@ -959,6 +1224,11 @@ SideBar (PC):                    BottomNavBar (모바일):
 | EditableStoryTitle 편집 모드 전환 | 텍스트 → input Cross-fade + 밑줄 색상 전환 | 150ms |
 | BookshelfClient 카드 등장 | Stagger Fade In + Slide Up (그리드 진입 시 순차) | 300ms |
 | DeleteStoryButton 확인 다이얼로그 | Modal Fade In + Scale 0.95 → 1 | 200ms |
+| 알림 배지(`unreadCount`) 갱신 — NEW v2.6 | 숫자 변경 시 Scale Pulse | 200ms |
+| NotificationsClient 항목 클릭(읽음 처리) — NEW v2.6 | `bg-mint-50` → 투명 + ● 점 Fade Out, `opacity` 100 → 60 | 200ms |
+| DiffViewer 하이라이트 토큰 등장 — NEW v2.6 | 추가/삭제 토큰 배경색 Fade In | 150ms |
+| ApprovalCard → ApprovalHistoryCard 이동 — NEW v2.6 | 승인/거절 처리 시 카드 Fade Out 후 '승인 내역' 탭에 Fade In | 250ms |
+| 대시보드 알림/승인 배너 등장 — NEW v2.6 | Slide Down + Fade In | 250ms |
 
 ### 기존 모션 (v1.0 유지)
 
@@ -1043,4 +1313,20 @@ SideBar (PC):                    BottomNavBar (모바일):
 
 ---
 
-*StoryBridge DesignSpec v2.5 | 2026.06.09*
+## v2.5 → v2.6 변경 요약 (2026.06.11)
+
+| 섹션 | 변경 내용 |
+|---|---|
+| §4.12 (신규) | StoryPageEditor — 페이지별 인라인 수정/제안 UI, `canEditDirectly`/`canPropose` 분기, 제안 사유 입력란 |
+| §4.13 | ApprovalCard/ApprovalHistoryCard v2.6 업데이트 — 스토리 제목·페이지 번호 배지(`📖 {제목}·{N}페이지`), `proposal_reason` 표시, '승인 내역' 탭용 ApprovalHistoryCard 신규 |
+| §4.14 (신규) | DiffViewer — LCS(최장 공통 부분열) 기반 토큰(단어) 단위 diff, 삭제/추가 단어만 하이라이트 |
+| §4.15 (신규) | NotificationsClient — 알림 목록, unread 표시, `notificationIcon` 타입별 분기, 읽음 처리/일괄 읽음 |
+| §5.13 (신규) | 협업 공간 '승인 대기'/'승인 내역' 탭 레이아웃 — ApprovalCard/ApprovalHistoryCard + DiffViewer + proposal_reason 적용 목업 |
+| §5.14 (신규) | `/notifications` 알림 페이지 레이아웃, SideBar/BottomNavBar 알림 배지(`unreadCount`) 진입 경로 |
+| §5.15 (신규) | 대시보드 — "승인 대기 N건" 배너 `/collab/{groupId}` 다이렉트 이동 버그 수정 + "안 읽은 알림 N건" 배너 신규 |
+| §7 아이콘 | 알림(🔔)·제안 도착/발신/결과(📩/📤/✅❌)·StoryPageEditor(✏️)·DiffViewer(git-compare)·제안 사유(💬)·승인 내역(history) 아이콘 9개 추가 |
+| §8 모션 | 알림 배지 펄스, 알림 항목 읽음 처리, DiffViewer 하이라이트 등장, ApprovalCard→ApprovalHistoryCard 이동, 대시보드 배너 등장 5건 추가 |
+
+---
+
+*StoryBridge DesignSpec v2.6 | 2026.06.11*
